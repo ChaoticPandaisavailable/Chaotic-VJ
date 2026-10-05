@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "renderer": {
+    "renderScale": 1,
+    "seed": 1337,
+    "grain": 0.035,
+    "aberration": 0.015,
+    "bloom": 0.16,
+    "adaptive": true,
+    "fieldScale": 1,
+    "quality": "fine",
+    "frameRate": "display",
+    "fullscreenUhd": true,
+    "outputResolution": "1080p"
+  },
+  "look": {
+    "depth": 0.72,
+    "shadow": 0.55,
+    "light": 0.6,
+    "morph": 0.85,
+    "chaotic": 0.47,
+    "lightAngle": 0.35,
+    "atmosphere": "classic"
+  },
+  "field": {
+    "style": 6,
+    "gesture": "flow",
+    "amplitude": 0.65,
+    "scale": 1
+  },
+  "variation": {
+    "surface": "fluid",
+    "complexity": 0.72,
+    "rotation": 0,
+    "cellSize": 12,
+    "transitionSeconds": 3,
+    "autoEvolve": false,
+    "evolution": 0.35,
+    "particleForm": 0.33,
+    "spread": 0.25,
+    "roam": true,
+    "roamAmount": 0.6,
+    "compositionSeed": 2
+  },
+  "colorMood": {
+    "enabled": true,
+    "warmth": 0.5,
+    "richness": 0.55
+  },
+  "colorLook": "storm",
+  "colorMotion": {
+    "enabled": false,
+    "seconds": 360
+  },
+  "colorRange": {
+    "enabled": false,
+    "warmMin": 0.2,
+    "warmMax": 0.65,
+    "richMin": 0,
+    "richMax": 0.5
+  },
+  "performance": {
+    "enabled": false,
+    "sceneB": 18,
+    "mix": 0,
+    "padTarget": "a"
+  },
+  "midi": {
+    "bindings": []
+  },
+  "macros": {
+    "energy": 0.68,
+    "chaos": 0.78,
+    "density": 0.72,
+    "memory": 0.66,
+    "fragmentation": 0.4,
+    "photoPresence": 0.55,
+    "motion": 0.62,
+    "morph": 0.4
+  },
+  "rhythm": {
+    "impact": 0.75,
+    "ripple": 0.6,
+    "drift": 0.55,
+    "color": 0.54
+  },
+  "modulation": {
+    "bass": 0.5,
+    "mid": 0.4,
+    "high": 0.5,
+    "onset": 0.65,
+    "flux": 0.5,
+    "level": 0.6,
+    "beat": 0.15
+  },
+  "palette": {
+    "mapping": "cinematic",
+    "colors": [
+      "#000000",
+      "#d8d7af",
+      "#34b3b6",
+      "#75517b",
+      "#262626"
+    ],
+    "background": "#000000",
+    "locked": false,
+    "photoColorMix": 0.02,
+    "transitionSeconds": 2,
+    "brightness": 0.97,
+    "contrast": 1.12,
+    "saturation": 0.91,
+    "drift": 0.07
+  },
+  "paletteBaseline": {
+    "palette": {
+      "mapping": "cinematic",
+      "colors": [
+        "#000000",
+        "#d8d7af",
+        "#34b3b6",
+        "#75517b",
+        "#262626"
+      ],
+      "background": "#000000",
+      "locked": false,
+      "photoColorMix": 0.02,
+      "transitionSeconds": 2,
+      "brightness": 0.97,
+      "contrast": 1.12,
+      "saturation": 0.91,
+      "drift": 0.07
+    },
+    "colorMood": {
+      "enabled": true,
+      "warmth": 0.5,
+      "richness": 0.55
+    },
+    "colorLook": "storm",
+    "colorMotion": {
+      "enabled": false,
+      "seconds": 360
+    }
+  },
+  "photos": {
+    "activeForSeconds": 15,
+    "fadeInSeconds": 2,
+    "fadeOutSeconds": 3,
+    "maxQueued": 100,
+    "coverage": 0.27,
+    "fragments": 16,
+    "warp": 0.4,
+    "clarity": 0.6,
+    "edgeThreshold": 0.25,
+    "moderation": false
+  },
+  "tempo": {
+    "bpm": 135.44018058690745,
+    "source": "tap",
+    "anchor": 0,
+    "offsetMs": -90
+  }
+}

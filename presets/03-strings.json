@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "renderer": {
+    "renderScale": 1,
+    "seed": 1337,
+    "grain": 0.12,
+    "aberration": 0.08,
+    "bloom": 0.2,
+    "adaptive": true,
+    "fieldScale": 0.85
+  },
+  "field": {
+    "style": 8,
+    "gesture": "orbit",
+    "amplitude": 0.26,
+    "scale": 1.68
+  },
+  "macros": {
+    "energy": 0.68,
+    "chaos": 0.46,
+    "density": 0.58,
+    "memory": 0.38,
+    "fragmentation": 0.46,
+    "photoPresence": 0.55,
+    "motion": 0.29,
+    "morph": 0.44
+  },
+  "rhythm": {
+    "impact": 0.75,
+    "ripple": 0.6,
+    "drift": 0.55,
+    "color": 0.4
+  },
+  "modulation": {
+    "bass": 0.7,
+    "mid": 0.4,
+    "high": 0.5,
+    "onset": 0.65,
+    "flux": 0.5,
+    "level": 0.6,
+    "beat": 0.2
+  },
+  "palette": {
+    "colors": [
+      "#08090c",
+      "#343943",
+      "#aca89f",
+      "#f1ebdd"
+    ],
+    "background": "#08090c",
+    "locked": true,
+    "photoColorMix": 0,
+    "transitionSeconds": 2,
+    "brightness": 1,
+    "contrast": 1.12,
+    "saturation": 0.9,
+    "drift": 0.14
+  },
+  "photos": {
+    "activeForSeconds": 15,
+    "fadeInSeconds": 2,
+    "fadeOutSeconds": 3,
+    "maxQueued": 100,
+    "coverage": 0.27,
+    "fragments": 16,
+    "warp": 0.4,
+    "clarity": 0.6,
+    "edgeThreshold": 0.25,
+    "moderation": false
+  },
+  "tempo": {
+    "bpm": 120,
+    "source": "internal",
+    "anchor": 0,
+    "offsetMs": 0
+  }
+}

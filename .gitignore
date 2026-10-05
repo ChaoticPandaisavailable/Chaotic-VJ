@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.runtime/
+test-results/
+backups/
+*.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+admin-key.txt
+credentials*.json
+.DS_Store
+Thumbs.db

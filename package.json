@@ -1,0 +1,33 @@
+{
+  "name": "chaotic-vj",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx apps/upload-server/index.ts",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx apps/upload-server/index.ts --production",
+    "check": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "butterchurn": "2.6.7",
+    "butterchurn-presets": "2.4.7",
+    "express": "^5.1.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.34.3",
+    "three": "^0.180.0",
+    "ws": "^8.18.3",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/three": "^0.180.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.7"
+  }
+}
