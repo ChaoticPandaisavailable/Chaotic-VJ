@@ -1,3 +1,4 @@
+import { nextShuffle, setShuffle, shuffleSteps } from './shuffle.ts';
 import { applyScenePreset, scenePresets, type Config } from './config.ts';
 import { type MidiTarget, unitClamp } from './midi.ts';
 
@@ -11,14 +12,22 @@ export function controlValue(config:Config,target:MidiTarget):number{
   const b=moodBounds(config);
   if(target==='warmth')return inverse(config.colorMood.warmth,b.x0,b.x1);
   if(target==='richness')return inverse(config.colorMood.richness,b.y0,b.y1);
+  if(target==='shuffle:next')return 0;
+  if(target==='shuffle')return config.renderer.shuffle/shuffleSteps;
   if(target==='mix')return config.performance.mix;
   if(target==='rotation')return (config.variation.rotation+1)/2;
   if(target==='complexity')return config.variation.complexity;
+  if(target.startsWith('music:'))return config.music[target.slice(6) as 'amount'|'impact'|'flow'|'detail'];
+  if(target.startsWith('section:'))return 0;
   if(target.startsWith('scene:'))return 0;
   return config.macros[target as keyof Config['macros']];
 }
 export function applyControl(config:Config,target:MidiTarget,value:number){
   value=unitClamp(value);const b=moodBounds(config);
+  if(target==='shuffle:next'){nextShuffle(config);return;}
+  if(target==='shuffle'){setShuffle(config,value);return;}
+  if(target.startsWith('music:')){config.music[target.slice(6) as 'amount'|'impact'|'flow'|'detail']=value;return;}
+  if(target.startsWith('section:')){config.music.section=target==='section:build'?'build':'steady';if(target==='section:release')config.music.releaseId++;return;}
   if(target.startsWith('scene:')){const scene=Number(target.split(':')[1]);if(config.performance.padTarget==='b')config.performance.sceneB=scene;else applyScenePreset(config,scenePresets[scene]);return;}
   if(target==='mix'){config.performance.enabled=true;config.performance.mix=value;return;}
   if(target==='warmth'){setColorMood(config,b.x0+value*(b.x1-b.x0),config.colorMood.richness);return;}

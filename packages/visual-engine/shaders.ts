@@ -64,9 +64,7 @@ uniform sampler2D uGlowNear,uGlowFar;
 uniform vec2 uResolution;
 uniform vec3 uColors[5],uBackgroundColor;
 uniform float uColorCount,uEnvelope,uPhotoPresence,uPhotoColorMix,uBrightness,uContrast,uSaturation,uGrain,uAberration,uBloom,uDrift,uTime,uBlackout;
-uniform vec4 uImpulses[3];
-uniform float uImpulseAngles[3],uStroke,uRipple;
-uniform float uColorPhase,uRhythmColor;
+uniform vec4 uMusic;
 uniform float uSurface[6],uCellSize,uComplexity,uParticleMix,uGraphicMix;
 uniform vec2 uFieldSize;
 uniform float uDepth,uShadow,uLight;
@@ -109,39 +107,19 @@ void main(){
   if(uBlackout>.5){ gl_FragColor=vec4(0.,0.,0.,1.);return; }
   float base=texture2D(uBackground,vUv).r;
   vec2 aspect=vec2(uResolution.x/uResolution.y,1.);
-  vec2 offset=uWander*.026*smoothstep(.22,.8,base);
-  float illumination=0.,colorPulse=0.;
-  for(int i=0;i<3;i++){
-    vec4 event=uImpulses[i];float age=event.z;
-    if(age>2.4||event.w<.01)continue;
-    vec2 d=(vUv-event.xy)*aspect;float radius=length(d);
-    float angle=uImpulseAngles[i];vec2 direction=vec2(cos(angle),sin(angle));
-    // Advect existing bright masses. No added pen stroke or drawn ring.
-    float region=exp(-dot(d,d)*1.5);
-    float excursion=(1.-exp(-age*8.))*exp(-age*1.6);
-    float mass=smoothstep(.18,.78,base);
-    float front=radius-age*(.48+event.w*.32);
-    float wave=sin(front*36.)*exp(-abs(front)*13.)*exp(-age*1.7);
-    float arc=.35+.65*pow(.5+.5*dot(d/max(radius,.001),direction),2.);
-    float attack=smoothstep(0.,.045,age);
-    float strength=event.w*attack;
-    colorPulse+=strength*exp(-age*1.4);
-    offset+=direction/aspect*excursion*strength*uStroke*.48*mass*region;
-    offset+=d/max(radius,.001)/aspect*wave*strength*uRipple*.022*mass*arc;
-    illumination+=strength*excursion*region*mass*uStroke*.09;
-  }
-  offset*=1.-uGraphicMix;
+  vec2 offset=vec2(0.);
+  float material=smoothstep(.06,.3,base)*(1.-smoothstep(.8,.97,base));
+  vec2 gradient=vec2(dFdx(base)*uResolution.x,dFdy(base)*uResolution.y);
+  float edge=smoothstep(.4,3.8,length(gradient))*material;
+  float filament=.5+.5*sin(dot(vUv*aspect,vec2(31.,19.))-uTime*1.8+base*13.);
   vec2 surfaceUV=clamp(vUv+offset,.001,.999);
   float f=texture2D(uBackground,surfaceUV).r;
-  // Lighter masses move and catch more light; dark negative space is retained.
-  f+=illumination*.06*(1.-uGraphicMix);
   f+=sin(uTime*.055+f*4.)*uDrift*.035*(1.-uGraphicMix);
   f=surfaceValue(f,clamp(vUv+offset,.001,.999));
   vec3 bg=palette(pow(max(f,0.),.93));
-  float pulse=uRhythmColor*clamp(colorPulse*.5+illumination,0.,1.);
-  if(pulse>.001){float colorFlow=sin(uColorPhase+f*4.+noise2(vUv*3.+uTime*.025))*.28;
-    bg=mix(bg,palette(clamp(pow(max(f,0.),.93)+colorFlow*.55,.01,.99)),pulse*(1.-smoothstep(.65,.95,f)));}
   bg=mix(uBackgroundColor,bg,smoothstep(.006,.09,f));
+  // Reflections belong to existing edges; the palette and negative space remain stable.
+  bg=mix(bg,vec3(1.),uMusic.y*edge*filament*.16*uSurface[0]*(1.-uGraphicMix));
   // Light grounds keep their exposure. Relief belongs to coloured masses, not the white negative space.
   float paleGround=smoothstep(.50,.86,dot(uBackgroundColor,vec3(.2126,.7152,.0722)));
   float relief=uDepth*uSurface[0]*(1.-uParticleMix*.85)*(1.-uGraphicMix*.7);

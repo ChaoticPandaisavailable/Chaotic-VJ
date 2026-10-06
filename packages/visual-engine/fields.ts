@@ -3,6 +3,7 @@ import { classicField } from './classic.ts';
 import { volumeField } from './volume.ts';
 import { secondaryStudies } from './studies.ts';
 import { revealMaskGLSL } from './morph.ts';
+import { materialFlowGLSL } from './material-flow.ts';
 /** Original distance-field studies, inspired by The Book of Shaders chapters 11–13. */
 export const fieldFragment = /* glsl */`
 precision highp float;
@@ -16,7 +17,10 @@ uniform float uHistoryValid;
 uniform float uRevealMix,uRevealSide,uRevealStrength;
 uniform float uComplexity,uAngle;
 uniform vec4 uComposition,uAtmosphere;
+uniform vec4 uMusic;
+uniform float uMusicRelease;
 uniform float uStructuralWarp,uVolumeSteps;
+${materialFlowGLSL}
 float hash(vec2 p){p+=mod(uSeed,997.)*vec2(.013,.027);vec3 a=fract(vec3(p.xyx)*.1031);a+=dot(a,a.yzx+33.33);return fract((a.x+a.y)*a.z);}
 vec2 hash2(vec2 p){return vec2(hash(p),hash(p+17.73));}
 float noise2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return texture2D(uNoise,(i+f+.5)/256.).r;}
@@ -32,11 +36,11 @@ return vec3(sqrt(first),sqrt(second),identity);}
 ${secondaryStudies}
 ${revealMaskGLSL}
 vec2 choreography(vec2 p,float t){
- float a=uAmplitude;float spring=uSpring*1.7+sin(t*1.1)*.12;
+ float a=uAmplitude;float spring=0.;
  if(uGesture<.5){p+=vec2(sin(t*.25),cos(t*.21))*.25*a;}
  else if(uGesture<1.5){p=rot(.16*sin(t*.4)+spring*.23*a)*p;p+=vec2(t*.62+spring,sin(t*.52)*.78)*a;p.x+=sin(p.y*.85+t*.6)*a*.42;}
  else if(uGesture<2.5){float side=tanh(p.x*1.5);p.x+=side*(sin(t*.72)*(.55+uBass*.7)-spring*.8)*a;p.y+=side*(cos(t*.6)*.75+spring)*a;p=rot(sin(t*.2)*.13)*p;}
- else if(uGesture<3.5){float charge=.5+.5*sin(uPhrase*6.2831);p*=1.+a*(charge*.5-uImpact*.34);p=rot(t*.13+a*spring*.2)*p;p+=vec2(sin(t*.33),cos(t*.26))*.3*a;}
+ else if(uGesture<3.5){p=rot(t*.08)*p;p+=vec2(sin(t*.15),cos(t*.12))*.3*a;}
  else if(uGesture<4.5){float direction=tanh(sin(p.y*1.3+sin(t*.3)*.4)*2.);p.x+=direction*(sin(t*.56)*.6+spring)*a;p.y+=sin(p.x*.7+t*.5)*.3*a;}
  else{p=rot(t*.3+a*spring*.25)*p;p+=vec2(sin(t*.37),cos(t*.29))*.7*a;}
  return p;
@@ -52,7 +56,9 @@ void main(){
    if((uRevealSide>0.&&coverage<.000001)||(uRevealSide<0.&&coverage>.999999))discard;
  }
  vec2 aspect=vec2(uResolution.x/uResolution.y,1.);
- vec2 origin=(vUv-.5)*aspect*3.2/max(.5,uScale);
+ // Evaluate the bounded map at this pixel, without a low-resolution displacement grid.
+ vec2 transported=transportMaterial((vUv-.5)*aspect);
+ vec2 origin=transported*3.2/max(.5,uScale);
  origin=rot(uComposition.z)*origin/uComposition.w+uComposition.xy;
  origin+=uStructuralWarp*.28*vec2(sin(origin.y*1.15+uTime*.06),sin(origin.x*.9-uTime*.045));
  #if FIELD_STYLE < 6 || FIELD_STYLE > 8
@@ -63,7 +69,6 @@ void main(){
  #if FIELD_STYLE == 2
  p=rot(sin(t*.12)*.18+uSpring*uAmplitude*.1)*origin+vec2(sin(t*.08)*.3,cos(t*.11)*.15)+uWander*.5;
  #endif
- p+=vec2(sin(t*.12+p.y),cos(t*.11+p.x))*uHigh*.025*noise2(p*.7+uSeed);
  float fresh=0.;
  #if FIELD_STYLE >= 11
  float sourceAngle=uAngle+uComposition.z;
@@ -75,7 +80,8 @@ void main(){
  vec3 sourceColor=texture2D(uParticles,1.-abs(mod(sourceUV,2.)-1.)).rgb;
  fresh=pow(clamp(dot(sourceColor,vec3(.2126,.7152,.0722)),0.,1.),.95);
  #elif FIELD_STYLE == 9 || FIELD_STYLE == 10
- fresh=texture2D(uParticles,vUv).r;
+ vec2 sourceUV=transported/aspect+.5;
+ fresh=texture2D(uParticles,1.-abs(mod(sourceUV,2.)-1.)).r;
  #elif FIELD_STYLE == 6
  fresh=atmosphereMaterial(p,t);
  #elif FIELD_STYLE > 6
@@ -83,8 +89,6 @@ void main(){
  #else
  fresh=sceneValue(p,float(FIELD_STYLE),t);
  #endif
- float location=noise2(p*.8+t*.1);
- fresh+=uImpact*.035*smoothstep(.45,.85,location);
  vec2 drift=vec2(sin(origin.y*1.3+t*.4),cos(origin.x*.9-t*.3));
  vec2 historyUV=vUv-drift*uDt*(.013+uAmplitude*.014);
  #if FIELD_STYLE >= 9

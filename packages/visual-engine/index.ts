@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { compositeFragment, photoFragment, vertex } from './shaders.ts';
 import { fieldFragment } from './fields.ts';
 import { createNoiseTexture } from './noise.ts';
-import { ImpulseField } from './impulses.ts';
+import { MaterialFlow } from './material-flow.ts';
+import { FlowReset } from './flow-reset.ts';
+import { compositionSeed } from '../shared/shuffle.ts';
 import { VariationState } from './variations.ts';
 import { createGlyphAtlas } from './glyphs.ts';
 import { ParticleCloud } from './particles.ts';
@@ -19,6 +21,7 @@ import { paletteLutFragment } from './palette-lut.ts';
 import { AdaptiveQuality } from '../shared/render-policy.ts';
 import { isMilkdropStyle } from '../shared/scene-catalog.ts';
 import type { PcmFrame } from '../audio-engine/pcm.ts';
+import { MusicForces } from '../audio-engine/music-forces.ts';
 import type { MilkdropDeck } from './milkdrop.ts';
 import { defaultConfig, scenePresets, photoEnvelope, type AudioFeatures, type Config, type Macros, type Transport } from '../shared/config.ts';
 
@@ -60,7 +63,7 @@ export class VisualEngine {
   private simulationTime = 0;
   private values: Macros = { ...defaultConfig.macros };
   private lastSeed = -1;
-  private lastClear = -1;
+  private flowReset=new FlowReset();
   private photoAge = 0;
   private blank: THREE.DataTexture;
   private noiseTexture=createNoiseTexture();
@@ -72,9 +75,7 @@ export class VisualEngine {
   private particleTarget:THREE.WebGLRenderTarget|null=null;
   private activeStyle=6;
   private particleMix=0;
-  private impulses=new ImpulseField();
-  private impulseUniforms=Array.from({length:3},()=>new THREE.Vector4(.5,.5,99,0));
-  private impulseAngles=new Float32Array(3);
+  private materialFlow=new MaterialFlow();
   private paletteKey='';
   private colorJourney=new ColorJourney();
   get colorPhase(){return this.colorJourney.phase;}
@@ -99,15 +100,9 @@ export class VisualEngine {
   preparing=false;
   get currentStyle(){return this.activeStyle;}
   get transitioning(){return this.deckA.transitioning;}
-  private impact=0;
-  private spring=0;
-  private springVelocity=0;
-  private onsetArmed=true;
-  private detail=0;
-  private detailTarget=0;
-  private detailWait=0;
-  private detailSeed=1949;
-  private flux=0;
+  private musicForces=new MusicForces();
+  private musicPcm=new Float32Array(0);
+  get musicResponse(){return this.musicForces.value;}
   private drawCount=0;
   private gpuQuery:WebGLQuery|null=null;
   private gpuExtension: { TIME_ELAPSED_EXT:number; GPU_DISJOINT_EXT:number } | null=null;
@@ -133,9 +128,10 @@ export class VisualEngine {
     this.renderer.debug.onShaderError = (_gl, _program, vs, fs) => { this.error = `Shader 编译失败: ${context.getShaderInfoLog(fs) || context.getShaderInfoLog(vs)}`; console.error(this.error); };
     this.blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1); this.blank.needsUpdate = true;
     const u = (value: unknown) => ({ value });
-    const common = { uResolution: u(new THREE.Vector2(1920,1080)), uTime: u(0), uDt: u(1/60), uSeed: u(1337),uNoise:u(this.noiseTexture),uWander:u(new THREE.Vector2()) };
+    const common = { uResolution: u(new THREE.Vector2(1920,1080)), uTime: u(0), uDt: u(1/60), uSeed: u(1337),uNoise:u(this.noiseTexture),uWander:u(new THREE.Vector2()),uMusic:u(new THREE.Vector4()),uMusicRelease:u(0),uMusicGain:u(0),uBeatSeconds:u(.5) };
     this.background = new THREE.ShaderMaterial({ vertexShader: vertex, fragmentShader: fieldFragment, depthTest: false, depthWrite: false, uniforms: { ...common,uResolution:u(new THREE.Vector2()), uHistory:u(this.blank), uEnergy:u(.5),uChaotic:u(0),uAtmosphere:u(this.atmosphere),uChaos:u(.6),uDensity:u(.5),uMemory:u(.65),uFragmentation:u(.5),uMorph:u(.3),uBass:u(0),uMid:u(0),uHigh:u(0),uOnset:u(0),uFlux:u(0),uBeat:u(0),uStyleA:u(0),uStyleB:u(0),uStyleMix:u(0),uGesture:u(1),uAmplitude:u(.7),uScale:u(1.3),uImpact:u(0),uPhrase:u(0) } });
     this.background.uniforms.uSpring=u(0);
+    this.background.uniforms.uTransport=u(Array.from({length:3},()=>new THREE.Vector4()));
     this.background.uniforms.uComplexity=u(.72);this.background.uniforms.uAngle=u(0);this.background.uniforms.uParticles=u(this.blank);
     this.background.uniforms.uComposition=u(new THREE.Vector4(0,0,0,1));this.background.uniforms.uStructuralWarp=u(0);this.background.uniforms.uVolumeSteps=u(28);
     this.background.uniforms.uHistoryValid=u(0);this.background.defines={FIELD_STYLE:6};this.materials.set(6,this.background);
@@ -143,9 +139,6 @@ export class VisualEngine {
     this.photo = new THREE.ShaderMaterial({ vertexShader: vertex, fragmentShader: photoFragment, depthTest:false, depthWrite:false, uniforms:{ ...common, uPhoto:u(this.blank), uPhotoHistory:u(this.blank), uBackground:u(this.blank),uPhotoSize:u(new THREE.Vector2(1,1)),uPhotoAspect:u(1),uCoverage:u(.27),uFragments:u(16),uPhotoWarp:u(.4),uClarity:u(.6),uEdgeThreshold:u(.25),uFragmentation:u(.5),uOnset:u(0) } });
     this.composite = new THREE.ShaderMaterial({ vertexShader:vertex, fragmentShader:compositeFragment,depthTest:false,depthWrite:false,uniforms:{ ...common,uBackground:u(this.blank),uPhotoHistory:u(this.blank),uColors:u(Array.from({length:5},(_,i)=>new THREE.Vector3(...this.hex(defaultConfig.palette.colors[Math.min(3,i)])))),uBackgroundColor:u(new THREE.Vector3(...this.hex(defaultConfig.palette.background))),uColorCount:u(4),uEnvelope:u(0),uPhotoPresence:u(.5),uPhotoColorMix:u(0),uBrightness:u(1),uContrast:u(1),uSaturation:u(1),uGrain:u(.1),uAberration:u(0),uBloom:u(0),uDrift:u(.1),uBlackout:u(0)} });
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(2,2),this.background); this.mesh.frustumCulled=false; this.scene.add(this.mesh);
-    this.composite.uniforms.uImpulses=u(this.impulseUniforms);this.composite.uniforms.uImpulseAngles=u(this.impulseAngles);
-    this.composite.uniforms.uStroke=u(.75);this.composite.uniforms.uRipple=u(.6);
-    this.composite.uniforms.uColorPhase=u(0);this.composite.uniforms.uRhythmColor=u(.4);
     this.composite.uniforms.uSurface=u(this.variation.weights);this.composite.uniforms.uGlyphs=u(this.glyphs);
     this.composite.uniforms.uCellSize=u(12);this.composite.uniforms.uComplexity=u(.72);this.composite.uniforms.uParticleMix=u(0);
     this.composite.uniforms.uGraphicMix=u(0);
@@ -249,7 +242,7 @@ export class VisualEngine {
     if(!this.readyMaterials.has(style))return null;
     const changing=style!==(side===0?this.activeStyle:this.activeB);
     if(changing&&!this.prepareTransition())return null;
-    if((style===9||style===10)&&!this.prepareGeometry(style,config.renderer.seed))return null;
+    if((style===9||style===10)&&!this.prepareGeometry(style,this.lastSeed))return null;
     if(isMilkdropStyle(style)&&!this.prepareSource(style,side,config))return null;
     return material;
   }
@@ -294,17 +287,26 @@ export class VisualEngine {
   private clearPhotoHistory(){this.clear(this.photos);}
   setPhoto(texture:THREE.Texture|null){ if(this.photoTexture===texture)return;this.photoTexture=texture;this.photoAge=0;this.clearPhotoHistory();this.photo.uniforms.uPhoto.value=texture??this.blank;if(texture){const i=texture.image;this.photo.uniforms.uPhotoSize.value.set(i.width,i.height);this.photo.uniforms.uPhotoAspect.value=i.width/i.height;} }
   setPhotoAge(age:number){this.photoAge=age;}
-  reset(){this.simulationTime=0;this.spring=0;this.springVelocity=0;this.impact=0;this.onsetArmed=true;this.impulses.reset(this.lastSeed);this.variation.reset();this.clearBackground();this.clearPhotoHistory();}
-  render(dt:number,config:Config,audio:AudioFeatures,transport:Transport,beat:number,pcm?:PcmFrame|null,sharedColorPhase?:number){
+  reset(){this.simulationTime=0;this.musicForces.reset();this.materialFlow.reset(this.lastSeed);this.variation.reset();this.clearBackground();this.clearPhotoHistory();}
+  render(dt:number,config:Config,audio:AudioFeatures,transport:Transport,beat:number,pcm?:PcmFrame|null,sharedColorPhase?:number,bpm=config.tempo.bpm){
     dt=Math.min(Math.max(dt,0),.1);
-    if(this.lastSeed!==config.renderer.seed){this.lastSeed=config.renderer.seed;this.reset();}
-    if(this.lastClear!==transport.clearVersion){this.lastClear=transport.clearVersion;this.clearBackground();}
+    const paused=transport.freeze||transport.blackout,seed=compositionSeed(config);
+    // Queue state changes while frozen, so resetting buffers cannot flash a blank frame.
+    const reset=this.flowReset.update(dt,seed,transport.clearVersion,paused);
+    if(reset==='composition'){this.lastSeed=this.flowReset.seed;this.reset();}
+    if(reset==='history'){this.musicForces.reset();this.materialFlow.reset(this.lastSeed);this.clearBackground();this.clearPhotoHistory();}
     const factor=1-Math.exp(-dt/ .5);
     // Keep the outgoing scene's controls stable while an unseen destination is preparing.
     if(config.field.style===this.activeStyle)for(const key of this.macroKeys)this.values[key]+=(config.macros[key]-this.values[key])*factor;
     for(const key of ['depth','shadow','light','morph','chaotic','lightAngle'] as const)this.look[key]+=(config.look[key]-this.look[key])*factor;
     const m=this.values,mod=config.modulation;
-    const paused=transport.freeze||transport.blackout;
+    const music=this.musicForces.update(dt,audio,config.music,bpm,paused);
+    let drivenPcm=pcm;
+    if(pcm){
+      if(this.musicPcm.length!==pcm.samples.length)this.musicPcm=new Float32Array(pcm.samples.length);
+      for(let i=0;i<pcm.samples.length;i++)this.musicPcm[i]=pcm.samples[i]*music.gain;
+      drivenPcm={samples:this.musicPcm,sampleRate:pcm.sampleRate};
+    }
     const presetB=scenePresets[config.performance.sceneB];
     this.requestedStyles=[config.field.style,config.performance.enabled?presetB.field.style:-1];
     for(let side=0;side<2;side++){const pending=this.incomingSources[side];if(pending&&pending.style!==this.requestedStyles[side]){pending.source?.dispose();this.incomingSources[side]=null;}}
@@ -337,7 +339,7 @@ export class VisualEngine {
     }
     if(!paused&&nextB&&this.activeB===presetB.field.style)this.commitSource(1,presetB.field.style);
     if(!paused){const target=config.performance.enabled&&this.activeB>=0?config.performance.mix:0;this.crossfade+=(target-this.crossfade)*(1-Math.exp(-dt/.24));if(Math.abs(target-this.crossfade)<.0001)this.crossfade=target;}
-    if(!transport.freeze&&!transport.blackout)this.simulationTime+=dt*(.2+m.motion*.9+audio.rms*mod.level*m.energy*.85);
+    if(!paused)this.simulationTime+=dt*(.2+m.motion*.9+music.flow*.12+music.release*.08);
     const b=this.background.uniforms,p=this.photo.uniforms,c=this.composite.uniforms;
     b.uChaotic.value=this.look.chaotic;
     const atmosphereIndex=['clouds','ink','nebula','classic'].indexOf(config.look.atmosphere);
@@ -353,28 +355,18 @@ export class VisualEngine {
     c.uParticleMix.value=this.particleMix;
     if(!paused)this.graphicMix+=(((this.activeStyle===10?1:0)*(1-this.crossfade)+(this.activeB===10?1:0)*this.crossfade)-this.graphicMix)*(1-Math.exp(-dt*4/config.variation.transitionSeconds));
     c.uGraphicMix.value=this.graphicMix;
-    if(!transport.freeze&&!transport.blackout)this.impulses.update(dt,(audio.kick??0)*mod.onset,config.rhythm.drift);
-    b.uWander.value.set(this.impulses.x,this.impulses.y);
-    for(let i=0;i<3;i++){const event=this.impulses.events[i];this.impulseUniforms[i].set(event.x,event.y,event.age,event.strength);this.impulseAngles[i]=event.angle;}
-    c.uStroke.value=config.rhythm.impact;c.uRipple.value=config.rhythm.ripple;
-    c.uColorPhase.value=this.impulses.colorPhase;c.uRhythmColor.value=config.rhythm.color;
-    b.uTime.value=this.simulationTime;b.uDt.value=dt;b.uSeed.value=config.renderer.seed;
+    const flow=this.materialFlow.update(dt,music,config,paused);
+    for(let i=0;i<3;i++)b.uTransport.value[i].fromArray(flow[i]);
+    b.uWander.value.set(0,0);
+    b.uMusic.value.set(music.flow*mod.bass/.7,music.detail*mod.high/.5,music.shear*mod.mid/.4,music.pressure);
+    b.uMusicRelease.value=music.release;b.uMusicGain.value=music.gain;
+    b.uTime.value=this.simulationTime;b.uDt.value=dt;b.uSeed.value=this.lastSeed;
     b.uEnergy.value=m.energy;b.uChaos.value=m.chaos;b.uDensity.value=m.density;b.uMemory.value=m.memory;b.uFragmentation.value=m.fragmentation;b.uMorph.value=m.morph;
     const field=this.activeField;
     b.uGesture.value=['flow','sweep','collision','surge','split','orbit'].indexOf(field.gesture);b.uAmplitude.value=field.amplitude;b.uScale.value=field.scale;
-    if(!transport.freeze&&!transport.blackout){
-      const movementHit=(audio.kick??0);
-      this.impact=Math.max((movementHit*.85+audio.onset*.15)*mod.onset,this.impact*Math.exp(-dt/.5));
-      if(movementHit<.18)this.onsetArmed=true;
-      if(movementHit>.3&&this.onsetArmed){this.springVelocity+=movementHit*mod.onset*7;this.onsetArmed=false;}
-      this.detailWait-=dt;
-      if(this.detailWait<=0){this.detailSeed=(Math.imul(this.detailSeed,1664525)+1013904223)|0;const r=(this.detailSeed>>>0)/4294967296;this.detailTarget=audio.high*(.12+r*.3);this.detailWait=.75+r*.8;}
-      this.detail+=(this.detailTarget-this.detail)*(1-Math.exp(-dt/.6));this.flux+=(audio.flux-this.flux)*(1-Math.exp(-dt/.35));
-      // Substeps keep the damped mass stable across 20–144 Hz displays and occasional slow frames.
-      for(let left=dt;left>0;){const h=Math.min(left,1/120);this.springVelocity+=(-75*this.spring-7*this.springVelocity)*h;this.spring+=this.springVelocity*h;left-=h;}
-    }
-    b.uImpact.value=this.impact;b.uSpring.value=this.spring;b.uPhrase.value=((beat%16)+16)%16/16;
-    b.uEnergy.value=Math.min(1,m.energy+audio.rms*mod.level*.25);b.uBass.value=audio.bass*mod.bass;b.uMid.value=audio.mid*mod.mid;b.uHigh.value=this.detail*mod.high;b.uOnset.value=this.impact*.25;b.uFlux.value=this.flux*mod.flux;b.uBeat.value=Math.pow(1-((beat%1)+1)%1,5)*mod.beat;
+    // Audio advances bounded travelling currents, not noise amplitude or camera scale.
+    b.uImpact.value=0;b.uSpring.value=0;b.uPhrase.value=0;
+    b.uBass.value=0;b.uMid.value=0;b.uHigh.value=0;b.uOnset.value=0;b.uFlux.value=0;b.uBeat.value=0;
     const gl=this.renderer.getContext() as WebGL2RenderingContext;const timer=this.gpuExtension;
     if(timer&&this.gpuQuery&&gl.getQueryParameter(this.gpuQuery,gl.QUERY_RESULT_AVAILABLE)){
       if(!gl.getParameter(timer.GPU_DISJOINT_EXT))this.gpuMs=gl.getQueryParameter(this.gpuQuery,gl.QUERY_RESULT)/1e6;
@@ -385,26 +377,26 @@ export class VisualEngine {
     if(!transport.freeze&&!transport.blackout){
       const renderDeck=(deck:SceneBuffer,material:THREE.ShaderMaterial,shape:Config['field'],macros:Macros,retiring:RetiringScene|null=null)=>{
         const drift=deck===this.deckA?this.compositionA:this.compositionB,original=shape.style>=6&&shape.style<=8,amount=original?0:config.variation.roamAmount;
-        if(!retiring)drift.update(dt,config.renderer.seed+shape.style*7919,config.variation.compositionSeed,!original&&config.variation.roam,config.variation.evolution);
+        if(!retiring)drift.update(dt,this.lastSeed+shape.style*7919,config.variation.compositionSeed,!original&&config.variation.roam,config.variation.evolution);
         const v=drift.values;
         b.uComposition.value.set(v[0]*.32*amount,v[1]*.24*amount,v[2]*.42*amount,Math.exp(v[3]*.23*amount));b.uStructuralWarp.value=v[4]*amount;
         const driftState=Object.assign(Object.create(this.variation),{complexity:THREE.MathUtils.clamp(this.variation.complexity+v[5]*.2*amount,0,1),angle:this.variation.angle+v[2]*.42*amount,particleForm:THREE.MathUtils.clamp(this.variation.particleForm+v[4]*.3*amount,0,1),spread:THREE.MathUtils.clamp(this.variation.spread+v[5]*.16*amount,0,1)});
         b.uComplexity.value=driftState.complexity;
         b.uGesture.value=['flow','sweep','collision','surge','split','orbit'].indexOf(shape.gesture);b.uAmplitude.value=shape.amplitude;b.uScale.value=shape.scale;
-        b.uEnergy.value=Math.min(1,macros.energy+audio.rms*mod.level*.25);b.uChaos.value=macros.chaos;b.uDensity.value=THREE.MathUtils.clamp(macros.density+v[5]*.12*amount,0,1);b.uMemory.value=macros.memory;b.uFragmentation.value=macros.fragmentation;b.uMorph.value=THREE.MathUtils.clamp(macros.morph+v[4]*.24*amount,0,1);
+        b.uEnergy.value=macros.energy;b.uChaos.value=macros.chaos;b.uDensity.value=THREE.MathUtils.clamp(macros.density+v[5]*.12*amount,0,1);b.uMemory.value=macros.memory;b.uFragmentation.value=macros.fragmentation;b.uMorph.value=THREE.MathUtils.clamp(macros.morph+v[4]*.24*amount,0,1);
         if(isMilkdropStyle(shape.style)){
           if(this.failedMilkdrop.has(shape.style))return;
           try{
             const source=retiring?retiring.source:deck===this.deckA?this.milkdropA:this.milkdropB;
             if(!source||source.preparing)return;
-            b.uParticles.value=source.render(shape.style,dt,deck.width,deck.height,pcm,macros.motion,config.renderer.quality,drift.revision,config.variation.roam?amount:0);
+            b.uParticles.value=source.render(shape.style,dt,deck.width,deck.height,drivenPcm,macros.motion,config.renderer.quality,drift.revision,config.variation.roam?amount:0);
             if(!this.failedMilkdrop.has(config.field.style)&&(!config.performance.enabled||!this.failedMilkdrop.has(presetB.field.style)))this.notice=null;
           }catch(error){this.failedMilkdrop.add(shape.style);this.notice=`开源视觉无法运行，可切回其他风格：${String(error)}`;return;}
         }
         if(shape.style===9||shape.style===10){
           this.particleTarget??=new THREE.WebGLRenderTarget(deck.width,deck.height,{format:THREE.RedFormat,type:this.fieldType,depthBuffer:false,stencilBuffer:false,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
-          if(shape.style===9){this.particles??=new ParticleCloud(this.glyphs);this.particles.render(this.renderer,this.particleTarget,driftState,this.simulationTime,audio.bass*mod.bass,this.impact,shape.scale*b.uComposition.value.w,config.renderer.seed);}
-          else{this.facets??=new FacetComposition();this.facets.render(this.renderer,this.particleTarget,driftState,this.simulationTime,this.impact,{...shape,scale:shape.scale*b.uComposition.value.w},{...macros,morph:b.uMorph.value},config.renderer.seed,v,amount);}
+          if(shape.style===9){this.particles??=new ParticleCloud(this.glyphs);this.particles.render(this.renderer,this.particleTarget,driftState,this.simulationTime,0,0,shape.scale*b.uComposition.value.w,this.lastSeed);}
+          else{this.facets??=new FacetComposition();this.facets.render(this.renderer,this.particleTarget,driftState,this.simulationTime,0,{...shape,scale:shape.scale*b.uComposition.value.w},{...macros,morph:b.uMorph.value},this.lastSeed,v,amount);}
           b.uParticles.value=this.particleTarget.texture;
         }
         b.uHistory.value=retiring?deck.retiringPrevious:deck.previous;b.uHistoryValid.value=retiring||deck.historyValid?1:0;
@@ -426,7 +418,7 @@ export class VisualEngine {
       if(this.crossfade>0&&this.crossfade<1){this.mixer.uniforms.uFrom.value=this.deckA.texture;this.mixer.uniforms.uTo.value=this.deckB.texture;this.mixer.uniforms.uMix.value=this.crossfade;this.mixer.uniforms.uPhase.value=this.simulationTime;this.mixer.uniforms.uStrength.value=this.look.morph;this.draw(this.mixer,this.mixed);}
       if(this.photoTexture){
         p.uPhotoHistory.value=this.photos[this.photoIndex].texture;p.uBackground.value=this.fieldTexture;
-        p.uCoverage.value=config.photos.coverage;p.uFragments.value=config.photos.fragments;p.uPhotoWarp.value=config.photos.warp;p.uClarity.value=config.photos.clarity;p.uEdgeThreshold.value=config.photos.edgeThreshold;p.uFragmentation.value=m.fragmentation;p.uOnset.value=audio.onset*mod.onset;
+        p.uCoverage.value=config.photos.coverage;p.uFragments.value=config.photos.fragments;p.uPhotoWarp.value=config.photos.warp;p.uClarity.value=config.photos.clarity;p.uEdgeThreshold.value=config.photos.edgeThreshold;p.uFragmentation.value=m.fragmentation;p.uOnset.value=music.shear*mod.onset;
         this.draw(this.photo,this.photos[1-this.photoIndex]);this.photoIndex=1-this.photoIndex;
       }
     }

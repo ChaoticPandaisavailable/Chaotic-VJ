@@ -1,8 +1,9 @@
 import { scenePresets, type Config } from '../../../packages/shared/config.ts';
-import { decodeMidi, MidiControl, midiTargets, type MidiBinding, type MidiTarget } from '../../../packages/shared/midi.ts';
+import { decodeMidi, MidiControl, midiTargets, isMidiTrigger, type MidiBinding, type MidiTarget } from '../../../packages/shared/midi.ts';
 import { applyControl, controlValue } from '../../../packages/shared/performance.ts';
 
-const labels:Record<string,string>={mix:'A / B 混合',warmth:'颜色 · 色相',richness:'颜色 · 点缀',energy:'能量',chaos:'扭曲',density:'密度',motion:'流速',morph:'形态',complexity:'复杂度',rotation:'旋转'};
+const labels:Record<string,string>={mix:'A / B 混合',warmth:'颜色 · 色相',richness:'颜色 · 点缀',energy:'能量',chaos:'扭曲',density:'密度',motion:'流速',morph:'形态',complexity:'复杂度',rotation:'旋转','shuffle:next':'Shuffle · 一键重排',shuffle:'Shuffle · 连续状态（兼容）'};
+Object.assign(labels,{'music:amount':'音乐 · 参与度','music:impact':'音乐 · 推动','music:flow':'音乐 · 流动','music:detail':'音乐 · 细节','section:steady':'段落 · 平稳','section:build':'段落 · 蓄力','section:release':'段落 · 释放'});
 const label=(target:MidiTarget)=>target.startsWith('scene:')?`场景 · ${scenePresets[Number(target.split(':')[1])].name}`:labels[target];
 const modes=[['absolute','绝对值'],['relative1','相对 1'],['relative2','相对 2'],['relative3','相对 3']] as const;
 const options=modes.map(([v,n])=>`<option value="${v}">${n}</option>`).join('');
@@ -27,8 +28,8 @@ export function mountMidi(app:HTMLElement,getConfig:()=>Config,changed:()=>void)
     const signal=decodeMidi(event.data);if(!signal)return;
     if(learning){
       if(signal.kind==='note'&&!signal.pressed)return;
-      if(!learning.startsWith('scene:')&&signal.kind!=='cc'){message('这个参数需要旋钮 CC；请转动要绑定的旋钮。');return;}
-      if(learning.startsWith('scene:')&&signal.kind==='cc'&&signal.value<64)return;
+      if(!isMidiTrigger(learning)&&signal.kind!=='cc'){message('这个参数需要旋钮 CC；请转动要绑定的旋钮。');return;}
+      if(isMidiTrigger(learning)&&signal.kind==='cc'&&signal.value<64)return;
       const config=getConfig(),target=learning;
       const binding:MidiBinding={target,kind:signal.kind,channel:signal.channel,number:signal.number,mode:query<HTMLSelectElement>('#midi-mode').value as MidiBinding['mode'],min:0,max:1,pickup:true};
       config.midi.bindings=config.midi.bindings.filter(b=>b.target!==target&&!(b.kind===binding.kind&&b.channel===binding.channel&&b.number===binding.number));
@@ -37,7 +38,7 @@ export function mountMidi(app:HTMLElement,getConfig:()=>Config,changed:()=>void)
     for(const binding of getConfig().midi.bindings){
       const key=JSON.stringify(binding);let control=controls.get(key);if(!control){control=new MidiControl();controls.set(key,control);}
       const value=control.value(signal,binding,controlValue(getConfig(),binding.target));
-      if(value!==null){applyControl(getConfig(),binding.target,value);changed();message(`${label(binding.target)} · ${binding.target.startsWith('scene:')?'已切换':`${Math.round(value*100)}%`}`);}
+      if(value!==null){applyControl(getConfig(),binding.target,value);changed();message(`${label(binding.target)} · ${isMidiTrigger(binding.target)?'已触发':`${Math.round(value*100)}%`}`);}
     }
   };
   async function selectPort(id:string){
@@ -90,6 +91,6 @@ export function mountMidi(app:HTMLElement,getConfig:()=>Config,changed:()=>void)
     query<HTMLSelectElement>('#scene-b').value=String(config.performance.sceneB);query<HTMLInputElement>('#mix-enabled').checked=config.performance.enabled;
     const mix=query<HTMLInputElement>('#scene-mix');if(document.activeElement!==mix)mix.value=String(config.performance.mix);query('#mix-value').textContent=`${Math.round(config.performance.mix*100)}%`;
     const key=JSON.stringify(config.midi.bindings);if(rowsKey===key)return;rowsKey=key;controls.clear();query('#midi-count').textContent=String(config.midi.bindings.length);
-    query('#midi-bindings').innerHTML=config.midi.bindings.length?config.midi.bindings.map(b=>`<div class="midi-binding" data-binding="${b.target}"><div><strong>${label(b.target)}</strong><span>${b.kind==='cc'?'CC':'音符'} ${b.number} · CH ${b.channel}</span><button data-unlearn="${b.target}" aria-label="移除 ${label(b.target)} 映射">×</button></div>${b.target.startsWith('scene:')?'':`<div class="binding-options"><select aria-label="${label(b.target)} 编码模式" data-binding-key="mode">${modes.map(([v,n])=>`<option value="${v}" ${b.mode===v?'selected':''}>${n}</option>`).join('')}</select><label>起<input type="number" aria-label="${label(b.target)} 起点" data-binding-key="min" min="0" max="100" value="${Math.round(b.min*100)}"/></label><label>止<input type="number" aria-label="${label(b.target)} 终点" data-binding-key="max" min="0" max="100" value="${Math.round(b.max*100)}"/></label><label title="绝对值旋钮经过当前值才接管"><input type="checkbox" data-binding-key="pickup" ${b.pickup?'checked':''}/>接管</label></div>`}</div>`).join(''):'<p class="fine">还没有映射。可先绑定 8 个打击垫，再绑定混合、色相与点缀旋钮。</p>';
+    query('#midi-bindings').innerHTML=config.midi.bindings.length?config.midi.bindings.map(b=>`<div class="midi-binding" data-binding="${b.target}"><div><strong>${label(b.target)}</strong><span>${b.kind==='cc'?'CC':'音符'} ${b.number} · CH ${b.channel}</span><button data-unlearn="${b.target}" aria-label="移除 ${label(b.target)} 映射">×</button></div>${isMidiTrigger(b.target)?'':`<div class="binding-options"><select aria-label="${label(b.target)} 编码模式" data-binding-key="mode">${modes.map(([v,n])=>`<option value="${v}" ${b.mode===v?'selected':''}>${n}</option>`).join('')}</select><label>起<input type="number" aria-label="${label(b.target)} 起点" data-binding-key="min" min="0" max="100" value="${Math.round(b.min*100)}"/></label><label>止<input type="number" aria-label="${label(b.target)} 终点" data-binding-key="max" min="0" max="100" value="${Math.round(b.max*100)}"/></label><label title="绝对值旋钮经过当前值才接管"><input type="checkbox" data-binding-key="pickup" ${b.pickup?'checked':''}/>接管</label></div>`}</div>`).join(''):'<p class="fine">还没有映射。可先绑定 8 个打击垫，再绑定混合、色相与点缀旋钮。</p>';
   }};
 }
