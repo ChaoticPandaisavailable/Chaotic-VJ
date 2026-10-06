@@ -45,13 +45,16 @@ export class MusicForces {
     dt=clamp(dt,0,.1);
     const audio=this.delay.update(dt,input,music.delayMs);
     // Tempo is deliberately absent from motion. Only measured sound opens this gate.
-    const audible=smoothstep(.008,.065,audio.rms);
+    const audible=smoothstep(.008,.04,audio.rms);
     const kick=(audio.kick??0)*audible;
     if(kick>.18&&kick>this.lastKick+.12){this.kickAge=0;this.kickStrength=kick;}
     this.lastKick=kick;this.kickAge+=dt;
     this.influence=smooth(this.influence,music.amount,dt,.12,.22);
     // Follow measured bass with a short attack; treble cannot accelerate the large-scale current.
-    this.body=smooth(this.body,audio.bass*clamp(audio.rms*8),dt,.12,.24);
+    // Bass already measures amplitude. Multiplying it by RMS again hid normal
+    // demo/music levels. A bounded soft knee preserves dynamics at small levels.
+    const bass=clamp(audio.bass),bassDrive=bass*1.24/(bass+.24);
+    this.body=smooth(this.body,bassDrive,dt,.085,.18);
     this.edge=smooth(this.edge,clamp(audio.high*.22+(audio.hat??0)*.85)*audible,dt,.035,.10);
     this.shear=smooth(this.shear,(audio.snare??0)*audible,dt,.045,.14);
     this.pressure=smooth(this.pressure,music.section==='build'?1:0,dt,2.8,.85);

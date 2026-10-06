@@ -48,11 +48,20 @@ test('kick force has a fast attack, stays nonnegative and does not retrigger whi
 });
 test('sustained bass responds smoothly and decays; treble lights edges without driving body',()=>{
   const f=new MusicForces();advance(f,2);
-  f.update(1/60,signal({rms:.5,bass:1}),settings(),120);assert.ok(f.value.flow>0&&f.value.flow<.15);
+  f.update(1/60,signal({rms:.5,bass:1}),settings(),120);assert.ok(f.value.flow>.1&&f.value.flow<.2);
   advance(f,2,signal({rms:.5,bass:1}));assert.ok(f.value.flow>.99);assert.equal(f.value.detail,0);
   advance(f,12);assert.ok(f.value.flow<.0001);
   const edge=new MusicForces();advance(edge,2);edge.update(1/60,signal({rms:.5,high:1,hat:1}),settings(),120);
   assert.ok(edge.value.detail>.25&&edge.value.detail<.5);assert.equal(edge.value.flow,0);assert.equal(edge.value.impact,0);assert.equal(edge.value.shear,0);
+});
+test('quiet measured bass is not multiplied away, while noise and treble stay out of the large current',()=>{
+  const quiet=new MusicForces();advance(quiet,2,signal({rms:.03,bass:.02}));
+  assert.ok(quiet.value.flow>.055&&quiet.value.flow<.1,'quiet bass must reach a usable control range');
+  const noise=new MusicForces();advance(noise,2,signal({rms:.006,bass:.15}));assert.equal(noise.value.flow,0);
+  const treble=new MusicForces();advance(treble,2,signal({rms:.3,high:.8,hat:.3}));assert.equal(treble.value.flow,0);
+  const soft=quiet.value.flow;advance(quiet,2,signal({rms:.1,bass:.12}));const medium=quiet.value.flow;
+  advance(quiet,2,signal({rms:.5,bass:.8}));assert.ok(medium>soft*3&&quiet.value.flow>medium*1.8);
+  advance(quiet,1);assert.equal(quiet.value.flow,0);
 });
 test('freeze holds forces; build and release are bounded, one-shot and do not replay on fresh load',()=>{
   const f=new MusicForces(),music=settings();advance(f,1);music.section='build';advance(f,10,silentFeatures(),music);

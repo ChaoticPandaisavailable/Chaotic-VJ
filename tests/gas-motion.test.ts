@@ -26,7 +26,8 @@ test('gas sheets stay finite and continuous through 30 minutes of maximum live f
       previous[i]=[...l];
     }
   }
-  flow.reset(1337);assert.deepEqual(flow.layers,make().layers);assert.deepEqual(flow.audioSpeed,[0,0,0]);
+  assert.ok(Number.isFinite(flow.evolution));
+  flow.reset(1337);assert.deepEqual(flow.layers,make().layers);assert.deepEqual(flow.audioSpeed,[0,0,0]);assert.equal(flow.evolution,0);
 });
 
 test('depth sheets move independently, keep flowing in silence and hold exactly on freeze',()=>{
@@ -70,16 +71,44 @@ test('audio strength drives wind promptly, without a BPM-generated tremor',()=>{
     assert.ok(flow.audioSpeed[0]<sustained*.001,'bass exit stops its wind even while treble continues');
     assert.ok(flow.layers.every(l=>Math.abs(l[2])+Math.abs(l[3])<.000001));
     assert.ok(flow.audioSpeed[2]>.01);return sustained;
-  });assert.ok(speeds[1]>speeds[0]*2&&speeds[2]>speeds[1]*1.7);
+  });assert.ok(speeds[1]>speeds[0]*1.7&&speeds[2]>speeds[1]*1.18,'soft-knee bass keeps audible dynamics instead of clipping them');
   const runs=[65,120,180].map(bpm=>{
     const music=new MusicForces(),flow=make();for(let i=0;i<360;i++)flow.update(1/60,music.update(1/60,i<120?{...silentFeatures(),rms:.3,bass:.5,kick:i%37===0?.6:0}:silentFeatures(),config.music,bpm),config);return flow.layers;
   });assert.deepEqual(runs[0],runs[1]);assert.deepEqual(runs[1],runs[2]);
 });
 
+test('bass advances internal gas growth monotonically; freeze and silence cannot cause recoil',()=>{
+  const gas=make();for(let i=0;i<60;i++)gas.update(1/60,response({}),defaultConfig);assert.equal(gas.evolution,0);
+  let last=0;for(let i=0;i<60;i++){gas.update(1/60,response({flow:.35}),defaultConfig);assert.ok(gas.evolution>last);last=gas.evolution;}
+  assert.ok(gas.evolution>.8,'measured bass must noticeably advance internal growth');
+  const frozen=gas.evolution;gas.update(.1,response({flow:1}),defaultConfig,true);assert.equal(gas.evolution,frozen);
+  for(let i=0;i<180;i++){gas.update(1/60,response({}),defaultConfig);assert.ok(gas.evolution>=last);last=gas.evolution;}
+  for(let i=0;i<60;i++)gas.update(1/60,response({}),defaultConfig);
+  assert.ok(gas.evolution-last<1e-8,'audio growth settles after silence without rewinding the material');
+});
+
+test('the UI demo WAV produces visible-scale movement at normal and reduced volume',()=>{
+  const config=structuredClone(defaultConfig);Object.assign(config.music,{amount:1,flow:.95,impact:1,detail:1});config.modulation.bass=.5;
+  for(const [volume,minPeak,minExtraGrowth,minTravelRatio]of [[1,.3,4,5],[.35,.12,1,2],[.12,.05,.2,1.2]]){
+    const extractor=new FeatureExtractor(),forces=new MusicForces(),gas=make(),quiet=make();
+    for(let i=0;i<60;i++)forces.update(1/60,silentFeatures(),config.music,120);
+    let peak=0,travel=0,quietTravel=0;
+    for(const frame of diagnosticAudio(60)){
+      const features=extractor.analyze(frame.time.map(x=>x*volume),frame.db.map(x=>x+20*Math.log10(volume)),frame.sampleRate,frame.dt);
+      const music=forces.update(frame.dt,features,config.music,120),old=[...gas.layers[0]],oldQuiet=[...quiet.layers[0]];
+      gas.update(frame.dt,music,config);quiet.update(frame.dt,response({}),config);
+      travel+=Math.hypot(gas.layers[0][0]-old[0],gas.layers[0][1]-old[1]);quietTravel+=Math.hypot(quiet.layers[0][0]-oldQuiet[0],quiet.layers[0][1]-oldQuiet[1]);
+      peak=Math.max(peak,music.flow);
+    }
+    assert.ok(peak>minPeak,'demo must produce useful bass control even below full volume');
+    assert.ok(gas.evolution>minExtraGrowth);assert.ok(travel>quietTravel*minTravelRatio);
+  }
+});
+
 test('master zero keeps natural wind only; equal live input is stable across display refresh rates',()=>{
   const a=make(),b=make();for(let i=0;i<120;i++){a.update(1/60,response({gain:0,flow:1,impact:1,detail:1,shear:1}),defaultConfig);b.update(1/60,response({}),defaultConfig);}assert.deepEqual(a.layers,b.layers);
   const runs=[30,60,144].map(hz=>{const f=make();for(let i=0;i<hz*10;i++)f.update(1/hz,response(i<hz*4?{flow:.4,shear:.2,detail:.3}:{}),defaultConfig);return f;});
-  for(const run of runs)for(let i=0;i<3;i++)for(let j=0;j<4;j++)assert.ok(Math.abs(run.layers[i][j]-runs[0].layers[i][j])<1e-9);
+  for(const run of runs){assert.ok(Math.abs(run.evolution-runs[0].evolution)<1e-9);for(let i=0;i<3;i++)for(let j=0;j<4;j++)assert.ok(Math.abs(run.layers[i][j]-runs[0].layers[i][j])<1e-9);}
 });
 
 test('actual test WAV drives layered wind at 30 / 60 / 144 Hz and settles after stopping',()=>{

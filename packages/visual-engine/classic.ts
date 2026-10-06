@@ -41,7 +41,10 @@ float classicMaterial(vec2 p,float time){
   float threshold=.48-uDensity*.28-uEnergy*.045;
   mass=smoothstep(threshold,1.02,mass)*voids;
   mass*=1.-uFragmentation*.12*(1.-smoothstep(.15,.7,r.y));
-  mass=mass*(1.25+uEnergy*.3)+uMid*.025*(r.x-.5)*smoothstep(.08,.3,mass)+uBeat*.008*voids;
-  return clamp(mass,0.,.96);
+  mass=mass*(1.+uEnergy*.12)+uMid*.025*(r.x-.5)*smoothstep(.08,.3,mass)+uBeat*.008*voids;
+  // Preserve coloured curl interiors. The old gain plus hard clipping flattened
+  // dense banks into white plateaus; this continuous shoulder retains their detail.
+  float radiance=pow(max(mass,0.),1.22);
+  return radiance/(1.+radiance*.30);
 }
 `;

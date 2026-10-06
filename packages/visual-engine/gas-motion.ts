@@ -11,12 +11,13 @@ export const hasGasMotion=(style:number)=>style===6;
 export class GasMotion {
   readonly layers:GasLayer[]=gasLayerSettings.map(()=>[0,0,0,0]);
   readonly audioSpeed=[0,0,0];
+  evolution=0;
   private phases=[0,0,0];
   private initial=[0,0,0];
   private vibration=0;
   reset(seed:number){
     const heading=((seed*0.61803398875)%1)*TAU;
-    this.vibration=0;
+    this.vibration=0;this.evolution=0;
     for(let i=0;i<3;i++){this.phases[i]=this.initial[i]=wrap(heading+gasLayerSettings[i].bias);this.audioSpeed[i]=0;this.layers[i].fill(0);}
   }
   update(dt:number,music:MusicResponse,config:Config,paused=false){
@@ -26,15 +27,18 @@ export class GasMotion {
     const bass=music.flow*m.bass/.7*gain,impact=music.impact*m.onset/.65*config.rhythm.impact/.75*gain;
     const middle=music.shear*m.mid/.4*gain,high=music.detail*m.high/.5*gain;
     const manual=(music.release*2+music.pressure*.14)*gain;
-    const targets=[bass*4.8+impact*3+manual,bass*2.8+middle*.55+manual*.65,bass*5.8+impact*2+middle*1.2+high*.65+manual];
+    const targets=[bass*7.2+impact*5.4+manual,bass*3.8+middle*.55+manual*.65,bass*8+impact*3.6+middle*1.2+high*.65+manual];
     const response=.07+config.rhythm.drift*.12,decay=Math.exp(-dt/response);
     this.vibration=wrap(this.vibration+dt*TAU*7.3);
     // Audio gates the vibration envelope; the carrier does not generate beat events.
     const tremor=.007*clamp(bass+impact*.55,0,1);
     for(let i=0;i<3;i++){
-      const target=clamp(targets[i],0,6),old=this.audioSpeed[i];
+      const target=clamp(targets[i],0,8),old=this.audioSpeed[i];
       const travel=target*dt+(old-target)*response*(1-decay);
       this.audioSpeed[i]=target+(old-target)*decay;
+      // Advance the gas's existing internal growth, not just a picture offset.
+      // Integrated travel never pulls the pattern back after a transient ends.
+      if(i===0)this.evolution+=travel*.8;
       const l=gasLayerSettings[i],layer=this.layers[i];
       this.phases[i]=wrap(this.phases[i]+l.rate*(.25+config.macros.motion*.75)*dt+travel*l.drive);
       // A long curved path keeps coordinates finite and continuous even after hours.

@@ -3,6 +3,8 @@ import { compositeFragment, photoFragment, vertex } from './shaders.ts';
 import { fieldFragment } from './fields.ts';
 import { createNoiseTexture } from './noise.ts';
 import { GasMotion, hasGasMotion } from './gas-motion.ts';
+import { StarfieldMotion } from './starfield.ts';
+import { NebulaMotion } from './nebula-motion.ts';
 import { FlowReset } from './flow-reset.ts';
 import { compositionSeed } from '../shared/shuffle.ts';
 import { VariationState } from './variations.ts';
@@ -76,6 +78,8 @@ export class VisualEngine {
   private activeStyle=6;
   private particleMix=0;
   private gasMotion=new GasMotion();
+  private starfield=new StarfieldMotion();
+  private nebulaMotion=new NebulaMotion();
   private paletteKey='';
   private colorJourney=new ColorJourney();
   get colorPhase(){return this.colorJourney.phase;}
@@ -132,6 +136,9 @@ export class VisualEngine {
     this.background = new THREE.ShaderMaterial({ vertexShader: vertex, fragmentShader: fieldFragment, depthTest: false, depthWrite: false, uniforms: { ...common,uResolution:u(new THREE.Vector2()), uHistory:u(this.blank), uEnergy:u(.5),uChaotic:u(0),uAtmosphere:u(this.atmosphere),uChaos:u(.6),uDensity:u(.5),uMemory:u(.65),uFragmentation:u(.5),uMorph:u(.3),uBass:u(0),uMid:u(0),uHigh:u(0),uOnset:u(0),uFlux:u(0),uBeat:u(0),uStyleA:u(0),uStyleB:u(0),uStyleMix:u(0),uGesture:u(1),uAmplitude:u(.7),uScale:u(1.3),uImpact:u(0),uPhrase:u(0) } });
     this.background.uniforms.uSpring=u(0);
     this.background.uniforms.uGasLayers=u(Array.from({length:3},()=>new THREE.Vector4()));
+    this.background.uniforms.uGasEvolution=u(0);
+    this.background.uniforms.uNebulaDrift=u(new THREE.Vector4());
+    this.background.uniforms.uSkyTime=u(0);this.background.uniforms.uMeteor=u(new THREE.Vector4());this.background.uniforms.uMeteorPath=u(new THREE.Vector4());
     this.background.uniforms.uComplexity=u(.72);this.background.uniforms.uAngle=u(0);this.background.uniforms.uParticles=u(this.blank);
     this.background.uniforms.uComposition=u(new THREE.Vector4(0,0,0,1));this.background.uniforms.uStructuralWarp=u(0);this.background.uniforms.uVolumeSteps=u(28);
     this.background.uniforms.uHistoryValid=u(0);this.background.defines={FIELD_STYLE:6};this.materials.set(6,this.background);
@@ -287,14 +294,14 @@ export class VisualEngine {
   private clearPhotoHistory(){this.clear(this.photos);}
   setPhoto(texture:THREE.Texture|null){ if(this.photoTexture===texture)return;this.photoTexture=texture;this.photoAge=0;this.clearPhotoHistory();this.photo.uniforms.uPhoto.value=texture??this.blank;if(texture){const i=texture.image;this.photo.uniforms.uPhotoSize.value.set(i.width,i.height);this.photo.uniforms.uPhotoAspect.value=i.width/i.height;} }
   setPhotoAge(age:number){this.photoAge=age;}
-  reset(){this.simulationTime=0;this.musicForces.reset();this.gasMotion.reset(this.lastSeed);this.variation.reset();this.clearBackground();this.clearPhotoHistory();}
+  reset(){this.simulationTime=0;this.musicForces.reset();this.gasMotion.reset(this.lastSeed);this.nebulaMotion.reset(this.lastSeed);this.starfield.reset(this.lastSeed);this.variation.reset();this.clearBackground();this.clearPhotoHistory();}
   render(dt:number,config:Config,audio:AudioFeatures,transport:Transport,beat:number,pcm?:PcmFrame|null,sharedColorPhase?:number,bpm=config.tempo.bpm){
     dt=Math.min(Math.max(dt,0),.1);
     const paused=transport.freeze||transport.blackout,seed=compositionSeed(config);
     // Queue state changes while frozen, so resetting buffers cannot flash a blank frame.
     const reset=this.flowReset.update(dt,seed,transport.clearVersion,paused);
     if(reset==='composition'){this.lastSeed=this.flowReset.seed;this.reset();}
-    if(reset==='history'){this.musicForces.reset();this.gasMotion.reset(this.lastSeed);this.clearBackground();this.clearPhotoHistory();}
+    if(reset==='history'){this.musicForces.reset();this.gasMotion.reset(this.lastSeed);this.nebulaMotion.reset(this.lastSeed);this.clearBackground();this.clearPhotoHistory();}
     const factor=1-Math.exp(-dt/ .5);
     // Keep the outgoing scene's controls stable while an unseen destination is preparing.
     if(config.field.style===this.activeStyle)for(const key of this.macroKeys)this.values[key]+=(config.macros[key]-this.values[key])*factor;
@@ -357,6 +364,10 @@ export class VisualEngine {
     c.uGraphicMix.value=this.graphicMix;
     const gas=this.gasMotion.update(dt,music,config,paused);
     for(let i=0;i<3;i++)b.uGasLayers.value[i].fromArray(gas[i]);
+    b.uGasEvolution.value=this.gasMotion.evolution;
+    this.nebulaMotion.update(dt,m.motion,this.gasMotion.audioSpeed[0],paused);b.uNebulaDrift.value.fromArray(this.nebulaMotion.values);
+    this.starfield.update(dt,paused);b.uSkyTime.value=this.starfield.time;
+    b.uMeteor.value.fromArray(this.starfield.meteor);b.uMeteorPath.value.fromArray(this.starfield.path);
     b.uWander.value.set(0,0);
     b.uMusic.value.set(music.flow*mod.bass/.7,music.detail*mod.high/.5,music.shear*mod.mid/.4,music.pressure);
     b.uMusicRelease.value=music.release;b.uMusicGain.value=music.gain;

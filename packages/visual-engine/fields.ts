@@ -21,6 +21,10 @@ uniform vec4 uMusic;
 uniform float uMusicRelease;
 uniform float uStructuralWarp,uVolumeSteps;
 uniform vec4 uGasLayers[3];
+uniform vec4 uNebulaDrift;
+uniform float uGasEvolution;
+uniform float uSkyTime;
+uniform vec4 uMeteor,uMeteorPath;
 ${gasCompositeGLSL}
 float hash(vec2 p){p+=mod(uSeed,997.)*vec2(.013,.027);vec3 a=fract(vec3(p.xyx)*.1031);a+=dot(a,a.yzx+33.33);return fract((a.x+a.y)*a.z);}
 vec2 hash2(vec2 p){return vec2(hash(p),hash(p+17.73));}
@@ -85,7 +89,7 @@ void main(){
  #elif FIELD_STYLE == 9 || FIELD_STYLE == 10
  fresh=texture2D(uParticles,vUv).r;
  #elif FIELD_STYLE == 6
- fresh=atmosphereMaterial(p,t,skyPoint);
+ fresh=atmosphereMaterial(p,t+uGasEvolution,skyPoint);
  #elif FIELD_STYLE > 6
  fresh=volumeMaterial(p,float(FIELD_STYLE),t);
  #else
