@@ -1,0 +1,4 @@
+.shuffle-control{display:flex;align-items:center;gap:15px;padding:16px 0;border-top:1px solid var(--line,#30352a)}
+.shuffle-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:40px;padding:9px 18px;border:1px solid #626d4e;border-radius:4px;background:#252e20;color:#e0e7ce;font-size:13px;cursor:pointer;white-space:nowrap}
+.shuffle-button span{font-size:19px;line-height:1}.shuffle-button:hover{background:#34402a;border-color:#a8ba83}.shuffle-button:active{background:#414f33}.shuffle-button:focus-visible{outline:2px solid #d4e6a4;outline-offset:3px}
+.shuffle-control p{margin:0;font-size:11px;line-height:1.65;color:#969d8c}

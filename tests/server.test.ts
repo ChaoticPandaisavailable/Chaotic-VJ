@@ -6,7 +6,7 @@ import path from 'node:path';
 import { request as httpRequest } from 'node:http';
 import sharp from 'sharp';
 import { WebSocket } from 'ws';
-import type { Snapshot } from '../packages/shared/config.ts';
+import { silentFeatures, type Snapshot } from '../packages/shared/config.ts';
 import { maxSceneId } from '../packages/shared/scene-catalog.ts';
 
 const port=5193,base=`http://localhost:${port}`,testDir=path.resolve(`.runtime/integration-test-${Date.now()}`);
@@ -42,6 +42,7 @@ test('audience has no admin read/delete/config/media access; csrf and host check
 
 test('preset API validates, saves and updates complete creative settings without altering the live configuration',async()=>{
   const live=(await state()).config,c=structuredClone(live);c.look.chaotic=.84;c.look.lightAngle=.28;c.palette.mapping='cinematic';c.palette.colors=['#fcfcfc','#bbccbb','#3d775e','#254638','#123123'];
+  c.music={amount:.85,impact:.6,flow:.9,detail:.3,section:'build',releaseId:2,delayMs:70};
   assert.equal((await req('/api/presets','POST',{name:'',config:c})).status,400);
   const response=await req('/api/presets','POST',{name:'我的雪松',config:c});assert.equal(response.status,201);const saved=await response.json();
   assert.deepEqual(saved.config,c);assert.deepEqual((await state()).config,live);
@@ -104,4 +105,19 @@ test('variation and colour macro settings round trip while scene changes preserv
   assert.equal(actual.field.style,maxSceneId);assert.equal(actual.performance.sceneB,maxSceneId);assert.deepEqual(actual.midi,c.midi);
   assert.equal((await req('/api/config','PUT',{...c,variation:{...c.variation,surface:'invalid'}})).status,400);
   await req('/api/config','PUT',original);
+});
+
+test('fast audio channel forwards only validated owner features without unrelated payload',async()=>{
+  const owner=ws(),preview=ws(),received:unknown[]=[];
+  preview.socket.on('message',raw=>{const message=JSON.parse(raw.toString());if(message.type==='audio-features')received.push(message.features);});
+  try{
+    await until(async()=>owner.id&&preview.id?true:false);
+    owner.socket.send(JSON.stringify({type:'claim',role:'output'}));await until(async()=>(await state()).ownerId===owner.id);
+    preview.socket.send(JSON.stringify({type:'audio-features',features:silentFeatures()}));
+    owner.socket.send(JSON.stringify({type:'audio-features',features:{...silentFeatures(),hat:5}}));
+    await sleep(60);assert.equal(received.length,0);
+    const features={...silentFeatures(),kick:.8,hat:.4};
+    owner.socket.send(JSON.stringify({type:'audio-features',features:{...features,extra:'not forwarded'}}));
+    await until(async()=>received.length===1);assert.deepEqual(received[0],features);
+  }finally{owner.socket.close();preview.socket.close();}
 });

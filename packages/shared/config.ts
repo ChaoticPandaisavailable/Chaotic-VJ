@@ -10,7 +10,7 @@ const moodSchema=z.object({enabled:z.boolean().default(false),warmth:unit.defaul
 const motionSchema=z.object({enabled:z.boolean(),seconds:z.number().finite().min(45).max(600)});
 export const configSchema = z.object({
   schemaVersion: z.literal(1),
-  renderer: z.object({ renderScale: z.number().min(0.35).max(1.5), seed: z.number().int().min(0).max(999999), grain: unit, aberration: unit, bloom: unit, adaptive: z.boolean().default(true), fieldScale: z.number().min(.35).max(1).default(1), quality:z.enum(['performance','fine','ultra']).default('fine'), frameRate:z.enum(['display','60','120','144','165']).default('display'),fullscreenUhd:z.boolean().default(true),outputResolution:z.enum(['auto','1080p','1440p','2160p']).default('2160p') }),
+  renderer: z.object({ renderScale: z.number().min(0.35).max(1.5), seed: z.number().int().min(0).max(999999), shuffle:z.number().int().min(0).max(127).default(0), grain: unit, aberration: unit, bloom: unit, adaptive: z.boolean().default(true), fieldScale: z.number().min(.35).max(1).default(1), quality:z.enum(['performance','fine','ultra']).default('fine'), frameRate:z.enum(['display','60','120','144','165']).default('display'),fullscreenUhd:z.boolean().default(true),outputResolution:z.enum(['auto','1080p','1440p','2160p']).default('2160p') }),
   look:z.object({depth:unit.default(.72),shadow:unit.default(.55),light:unit.default(.6),morph:unit.default(.85),chaotic:unit.default(0),lightAngle:unit.default(.35),atmosphere:z.enum(['clouds','ink','nebula','classic']).default('clouds')}).default({depth:.72,shadow:.55,light:.6,morph:.85,chaotic:0,lightAngle:.35,atmosphere:'clouds'}),
   field: z.object({ style: z.number().int().min(0).max(maxSceneId).default(6), gesture: z.enum(['flow','sweep','collision','surge','split','orbit']).default('flow'), amplitude: unit.default(.7), scale: z.number().min(.5).max(3).default(1) }).default({style:6,gesture:'flow',amplitude:.7,scale:1}),
   variation: z.object({
@@ -31,6 +31,7 @@ export const configSchema = z.object({
   macros: z.object({ energy: unit, chaos: unit, density: unit, memory: unit, fragmentation: unit, photoPresence: unit, motion: unit, morph: unit }),
   rhythm: z.object({impact:unit,ripple:unit,drift:unit,color:unit.default(.4)}).default({impact:.75,ripple:.6,drift:.55,color:.4}),
   modulation: z.object({ bass: unit, mid: unit, high: unit, onset: unit, flux: unit, level: unit, beat: unit }),
+  music: z.object({amount:unit.default(.7),impact:unit.default(.7),flow:unit.default(.6),detail:unit.default(.5),section:z.enum(['steady','build']).default('steady'),releaseId:z.number().int().min(0).default(0),delayMs:z.number().int().min(0).max(250).default(0)}).default({amount:.7,impact:.7,flow:.6,detail:.5,section:'steady',releaseId:0,delayMs:0}),
   palette:paletteSchema,
   paletteBaseline:z.object({palette:paletteSchema,colorMood:moodSchema,colorLook:z.enum(colorLookIds),colorMotion:motionSchema}).nullable().default(null),
   photos: z.object({ activeForSeconds: z.number().min(2).max(120), fadeInSeconds: z.number().min(0).max(10), fadeOutSeconds: z.number().min(0.2).max(20), maxQueued: z.number().int().min(1).max(300), coverage: z.number().min(0.05).max(0.7), fragments: z.number().int().min(4).max(40), warp: unit, clarity: unit, edgeThreshold: unit, moderation: z.boolean() }),
@@ -41,7 +42,7 @@ export type Macros = Config['macros'];
 export type MacroKey = keyof Macros;
 export const defaultConfig: Config = {
   schemaVersion: 1,
-  renderer: { renderScale: 1, seed: 1337, grain: .035, aberration: .015, bloom: .14, adaptive: true, fieldScale: 1, quality:'fine', frameRate:'display', fullscreenUhd:true,outputResolution:'2160p' },
+  renderer: { renderScale: 1, seed: 1337, shuffle:0, grain: .035, aberration: .015, bloom: .14, adaptive: true, fieldScale: 1, quality:'fine', frameRate:'display', fullscreenUhd:true,outputResolution:'2160p' },
   look:{depth:.72,shadow:.55,light:.6,morph:.85,chaotic:0,lightAngle:.35,atmosphere:'clouds'},
   field: { style:6,gesture:'flow',amplitude:.7,scale:1 },
   variation: {surface:'fluid',complexity:.72,rotation:0,cellSize:12,transitionSeconds:3,autoEvolve:false,evolution:.35,particleForm:.33,spread:.25,roam:true,roamAmount:.6,compositionSeed:0},
@@ -54,6 +55,7 @@ export const defaultConfig: Config = {
   macros: { energy: 0.7, chaos: 0.65, density: 0.68, memory: 0.52, fragmentation: 0.35, photoPresence: 0.55, motion: 0.72, morph: 0.35 },
   rhythm: {impact:.75,ripple:.6,drift:.55,color:.4},
   modulation: { bass: 0.7, mid: 0.4, high: 0.5, onset: 0.65, flux: 0.5, level: 0.6, beat: 0.2 },
+  music: {amount:.7,impact:.7,flow:.6,detail:.5,section:'steady',releaseId:0,delayMs:0},
   paletteBaseline:null,
   palette: { mapping:'even', colors: ['#08090c', '#343943', '#aca89f', '#f1ebdd'], background: '#08090c', locked: true, photoColorMix: 0, transitionSeconds: 2, brightness: 1, contrast: 1.12, saturation: 0.9, drift: 0.14 },
   photos: { activeForSeconds: 15, fadeInSeconds: 2, fadeOutSeconds: 3, maxQueued: 100, coverage: 0.27, fragments: 16, warp: 0.4, clarity: 0.6, edgeThreshold: 0.25, moderation: false },
@@ -85,8 +87,8 @@ export function applyScenePreset(config:Config,preset:typeof scenePresets[number
 export interface Transport { freeze: boolean; blackout: boolean; queuePaused: boolean; clearVersion: number }
 export type PhotoStatus = 'Processing' | 'Pending' | 'Queued' | 'Active' | 'Fading' | 'Done' | 'Deleted' | 'Failed';
 export interface PhotoRecord { id: string; seq: number; name: string; status: PhotoStatus; receivedAt: number; age: number; aspect: number; owner: string; error?: string; palette?: string[]; luminance?: number }
-export interface AudioFeatures { rms: number; bass: number; mid: number; high: number; centroid: number; flux: number; onset: number; kick:number; peak: number }
-export const silentFeatures = (): AudioFeatures => ({ rms: 0, bass: 0, mid: 0, high: 0, centroid: 0, flux: 0, onset: 0, kick:0, peak: 0 });
+export interface AudioFeatures { rms: number; bass: number; mid: number; high: number; centroid: number; flux: number; onset: number; kick:number; snare:number; hat:number; peak: number }
+export const silentFeatures = (): AudioFeatures => ({ rms: 0, bass: 0, mid: 0, high: 0, centroid: 0, flux: 0, onset: 0, kick:0, snare:0, hat:0, peak: 0 });
 export interface DJState { source: 'osc' | 'os2l' | null; connected: boolean; receivedAt: number | null; deckId: number | null; currentBpm: number | null; originalBpm: number | null; beatPosition: number | null; beatPhase: number | null; beatInBar: number | null }
 export const emptyDJ = (): DJState => ({ source: null, connected: false, receivedAt: null, deckId: null, currentBpm: null, originalBpm: null, beatPosition: null, beatPhase: null, beatInBar: null });
 export interface Snapshot { config: Config; transport: Transport; photos: PhotoRecord[]; activeId: string | null; ownerId: string | null; ownerRole?:'preview'|'output'|'control'|null; ownerReady: boolean; dj: DJState; uploadUrls: string[] }

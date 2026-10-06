@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { sceneCount } from './scene-catalog.ts';
 
 const unit=z.number().finite().min(0).max(1);
-export const midiTargets=[...Array.from({length:sceneCount},(_,i)=>`scene:${i}` as const),'mix','warmth','richness','energy','chaos','density','motion','morph','complexity','rotation'] as const;
+export const midiTargets=[...Array.from({length:sceneCount},(_,i)=>`scene:${i}` as const),'mix','warmth','richness','energy','chaos','density','motion','morph','complexity','rotation','shuffle:next','shuffle','music:amount','music:impact','music:flow','music:detail','section:steady','section:build','section:release'] as const;
+export const isMidiTrigger=(target:string)=>target==='shuffle:next'||target.startsWith('scene:')||target.startsWith('section:');
 export const midiBindingSchema=z.object({
   target:z.enum(midiTargets),kind:z.enum(['note','cc']),channel:z.number().int().min(1).max(16),number:z.number().int().min(0).max(127),
   mode:z.enum(['absolute','relative1','relative2','relative3']).default('absolute'),
@@ -33,7 +34,7 @@ export class MidiControl {
   private sent:number|null=null;
   value(signal:MidiSignal,binding:MidiBinding,current:number):number|null{
     if(signal.kind!==binding.kind||signal.channel!==binding.channel||signal.number!==binding.number)return null;
-    if(binding.target.startsWith('scene:')){
+    if(isMidiTrigger(binding.target)){
       const high=signal.kind==='note'?signal.pressed:signal.value>=64;
       const trigger=high&&!this.caught;this.caught=high;return trigger?1:null;
     }

@@ -19,7 +19,7 @@ vec2 atmosphereSwirl(vec2 p,vec2 center,float radius,float angle){
  vec2 d=p-center;return center+rot(angle*exp(-dot(d,d)/radius))*d;
 }
 float cloudAtmosphere(vec2 p,float time){
- // The engine clock already applies Motion and audio speed. Keep the nested
+ // The engine clock already applies Motion. Keep the nested
  // flows evolving at their own rates instead of slowing that clock a second time.
  float t=time;
  p=p*.55+vec2(mod(uSeed,113.)*.037,mod(uSeed,83.)*.029);
@@ -76,18 +76,43 @@ float nebulaAtmosphere(vec2 p,float time){
  float halo=exp(-radius*radius*.65)*gas*.19;
  float mass=(sweep*.90+core*.9+halo)*(.85+uEnergy*.25);
  mass+=(filaments-.45)*smoothstep(.08,.5,mass)*.13;
- // Sparse, stable points at mixed sizes; the main field remains continuous.
- vec2 starPos=p*28.,cell=floor(starPos),local=fract(starPos)-.5;
- float seed=hash(cell+71.),spark=1.-smoothstep(.012,.065,length(local));
- float stars=step(.993,seed)*spark*(1.-smoothstep(.08,.3,mass))*.52;
- return clamp(mass+stars+uBass*.025*core,0.,.97);
+ return clamp(mass+uBass*.025*core,0.,.97);
 }
-float atmosphereMaterial(vec2 p,float t){
+// Six extra noise samples for the near/far veils, rather than rendering the full field three times.
+float gasVeil(vec2 p){
+ float broad=atmosphereNoise(p*.71);
+ float curl=atmosphereNoise(p*1.63+vec2(5.4,9.1));
+ float detail=atmosphereNoise(p*3.67+vec2(curl,broad)*.55);
+ return broad*.57+curl*.29+detail*.14;
+}
+float starLayer(vec2 p,float grid,float threshold,float salt){
+ vec2 cell=floor(p*grid),local=fract(p*grid);
+ float identity=hash(cell+salt);
+ vec2 center=.22+.56*hash2(cell+salt+19.);
+ float pixel=grid/uResolution.y;
+ float radius=mix(.65,1.2,hash(cell+salt+41.))*pixel*max(1.,uResolution.y/1080.);
+ float spark=1.-smoothstep(max(0.,radius-pixel*.65),radius+pixel*.65,length(local-center));
+ return step(threshold,identity)*spark*mix(.22,.65,hash(cell+salt+57.));
+}
+float gasStars(vec2 sky){
+ // The sky is separate from the material coordinates: clouds can cover it without stretching it.
+ return starLayer(sky,52.,.986,71.)+starLayer(sky+vec2(3.7,8.2),83.,.997,127.)*.6;
+}
+float atmosphereMaterial(vec2 screen,float t,vec2 sky){
+ vec2 p=screen-uGasLayers[0].xy+uGasLayers[0].zw;
  float field=0.;
  if(uAtmosphere.x>.0001)field+=cloudAtmosphere(p,t)*uAtmosphere.x;
  if(uAtmosphere.y>.0001)field+=inkAtmosphere(p,t)*uAtmosphere.y;
  if(uAtmosphere.z>.0001)field+=nebulaAtmosphere(p,t)*uAtmosphere.z;
  if(uAtmosphere.w>.0001)field+=classicMaterial(p,t)*uAtmosphere.w;
- return field;
+ float farDensity=gasVeil((screen-uGasLayers[1].xy+uGasLayers[1].zw)*.67+vec2(13.8,7.2));
+ float nearDensity=gasVeil((screen-uGasLayers[2].xy+uGasLayers[2].zw)*1.13+vec2(3.7,19.1));
+ float farAlpha=smoothstep(.49,.79,farDensity)*.26;
+ float nearAlpha=smoothstep(.43,.77,nearDensity)*.38*smoothstep(.012,.22,field+farAlpha*.2);
+ float bodyAlpha=clamp(field,0.,.97);
+ vec3 alpha=vec3(nearAlpha,bodyAlpha,farAlpha);
+ vec3 light=vec3(.32+nearDensity*.55,.70+bodyAlpha*.30,.25+farDensity*.32);
+ float stars=gasStars(sky)*uAtmosphere.z;
+ return clamp(compositeGas(alpha,light,stars)*1.06,0.,.97);
 }
 `;

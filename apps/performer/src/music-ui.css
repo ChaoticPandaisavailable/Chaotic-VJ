@@ -1,0 +1,14 @@
+.music-panel{padding:20px 0;border-top:1px solid var(--line,#30352a);border-bottom:1px solid var(--line,#30352a);margin-bottom:22px}
+.music-panel .panel-title{margin-bottom:16px}.music-state{font-size:11px;color:#a8b691;font-variant-numeric:tabular-nums}
+.music-panel .setting small{display:block;font-size:10px;color:#969d8c;line-height:1.5;margin-top:6px}
+.music-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}
+.music-controls .setting{min-width:0}.music-controls input{width:100%}.music-controls .setting>span{font-size:12px}
+.music-meters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:12px 0 18px}
+.music-meters>div>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.music-meters meter{display:block;width:100%;height:4px;background:#292f25;border:0}
+.music-meters meter::-webkit-meter-bar{background:#292f25;border:0}.music-meters meter::-webkit-meter-optimum-value{background:#c9dc91}
+.music-sections{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.music-sections button{min-height:34px;border:1px solid #333b2c;font-size:12px}
+.music-sections button[aria-pressed=true],.music-sections button.active{background:#303c25;color:#dceabb;border-color:#6b8050}
+.music-calibration{margin-top:16px}.music-calibration summary{font-size:11px;color:#969d8c;cursor:pointer}.music-align{margin:12px 0;font-size:12px;border:1px solid #414c36;padding:6px 12px}
+.music-panel button:focus-visible,.music-panel summary:focus-visible{outline:2px solid #c9dc91;outline-offset:3px}

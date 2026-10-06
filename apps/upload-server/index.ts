@@ -118,6 +118,13 @@ wss.on('connection',socket=>{
     if(message.type==='release'&&owner===client){owner=null;client.role='control';client.ready=false;broadcast();}
     if(message.type==='stop-audio'&&owner){send(owner,{type:'stop-audio'});return;}
     if(owner!==client)return;
+    if(message.type==='audio-features'){
+      const incoming=message.features;
+      const keys=['rms','bass','mid','high','centroid','flux','onset','kick','snare','hat','peak'];
+      if(!incoming||keys.some(key=>typeof incoming[key]!=='number'||!Number.isFinite(incoming[key])||incoming[key]<0||incoming[key]>1))return;
+      const features=Object.fromEntries(keys.map(key=>[key,incoming[key]]));
+      for(const c of clients.values())if(c!==client)send(c,{type:'audio-features',features});
+    }
     if(message.type==='frame'){
       const now=Date.now(),elapsed=client.lastFrame?Math.max(0,(now-client.lastFrame)/1000):0;const wasReady=client.ready,oldId=queue.activeId,oldStatus=oldId?queue.get(oldId)?.status:null;client.lastFrame=now;client.ready=true;
       if(typeof message.id==='string'&&typeof message.delta==='number')queue.advance(message.id,Math.min(message.delta,elapsed+.025));

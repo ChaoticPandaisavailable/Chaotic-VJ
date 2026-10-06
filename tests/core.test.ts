@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PhotoQueue } from '../apps/upload-server/queue.ts';
-import { defaultConfig, photoEnvelope, estimateWait, configSchema } from '../packages/shared/config.ts';
+import { defaultConfig, photoEnvelope, estimateWait, configSchema, silentFeatures } from '../packages/shared/config.ts';
 import { FeatureExtractor, smooth } from '../packages/audio-engine/features.ts';
 import { JsonFrames, parseOS2L, readOSC, oscMessage } from '../packages/dj-bridge/index.ts';
 import { ImpulseField } from '../packages/visual-engine/impulses.ts';
@@ -40,7 +40,7 @@ test('presets reject unbounded values, malformed colors and non-finite numbers',
 });
 test('audio smooth is time based; silence is stable; bass and high use different bands',()=>{
   let split=0;for(let i=0;i<60;i++)split=smooth(split,1,1/60,.2,.4);assert.ok(Math.abs(split-smooth(0,1,1,.2,.4))<1e-10);
-  const time=new Float32Array(2048),db=new Float32Array(1024).fill(-Infinity),extractor=new FeatureExtractor();assert.deepEqual(extractor.analyze(time,db,48000,1/60),{rms:0,bass:0,mid:0,high:0,centroid:0,flux:0,onset:0,kick:0,peak:0});
+  const time=new Float32Array(2048),db=new Float32Array(1024).fill(-Infinity),extractor=new FeatureExtractor();assert.deepEqual(extractor.analyze(time,db,48000,1/60),silentFeatures());
   for(let i=0;i<time.length;i++)time[i]=Math.sin(i*.03)*.1;db[4]=-10;let f=extractor.analyze(time,db,48000,.1);assert.ok(f.bass>f.high);const treble=new FeatureExtractor();db.fill(-Infinity);for(let i=200;i<350;i++)db[i]=-20;f=treble.analyze(time,db,48000,.1);assert.ok(f.high>f.bass);assert.ok(f.onset>0);
 });
 test('low-band transient drives kick; treble-only hits do not trigger a kick',()=>{
