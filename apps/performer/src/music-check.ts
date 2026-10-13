@@ -45,7 +45,7 @@ document.querySelector<HTMLButtonElement>('#audio')!.onclick=async()=>{
     const oscillator=audio.createOscillator(),gain=audio.createGain(),mute=audio.createGain();oscillator.frequency.value=hz;gain.gain.value=.35;mute.gain.value=0;
     oscillator.connect(gain).connect(analyser).connect(mute).connect(audio.destination);oscillator.start();
     const extractor=new FeatureExtractor(),time=new Float32Array(2048),db=new Float32Array(1024);let peak=silentFeatures(),last=performance.now();
-    for(let i=0;i<24;i++){await new Promise<void>(r=>requestAnimationFrame(()=>r()));const now=performance.now();analyser.getFloatTimeDomainData(time);analyser.getFloatFrequencyData(db);const f=extractor.analyze(time,db,audio.sampleRate,(now-last)/1000);last=now;for(const key of Object.keys(peak)as (keyof AudioFeatures)[])peak[key]=Math.max(peak[key],f[key]);}
+    for(let i=0;i<24;i++){await new Promise<void>(r=>requestAnimationFrame(()=>r()));const now=performance.now();analyser.getFloatTimeDomainData(time);analyser.getFloatFrequencyData(db);const f=extractor.analyze(time,db,audio.sampleRate,(now-last)/1000);last=now;for(const key of Object.keys(peak)as (keyof AudioFeatures)[]){const value=f[key];if(value!==undefined)peak[key]=Math.max(peak[key]??0,value);}}
     oscillator.stop();oscillator.disconnect();gain.disconnect();analyser.disconnect();mute.disconnect();results.push({name,hz,peak});
   }
   await audio.close();document.querySelector('#audio-results')!.textContent=JSON.stringify(results,null,2);

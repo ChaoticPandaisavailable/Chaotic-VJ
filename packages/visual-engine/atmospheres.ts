@@ -26,19 +26,23 @@ float cloudAtmosphere(vec2 p,float time){
  p=p*.55+vec2(mod(uSeed,113.)*.037,mod(uSeed,83.)*.029);
  p=atmosphereSwirl(p,vec2(.7,-.3),3.6,.8+sin(t*.09)*.24);
  vec2 drift=vec2(t*.045,-t*.025);
- vec2 q=atmosphereFlow(p*.83+drift);
- vec2 r=atmosphereFlow(p+q*(1.8+uChaos*.8)+vec2(-t*.033,t*.027));
- vec2 advected=p+r*(2.1+uChaotic*.85)+q*.65;
+ // Broad banks carry the fine curls. Keep the domain warp gentle enough that
+ // neighbouring wisps read as one cloud rather than many competing islands.
+ vec2 q=atmosphereFlow(p*.62+drift);
+ vec2 r=atmosphereFlow(p*.78+q*(1.15+uChaos*.45)+vec2(-t*.033,t*.027));
+ vec2 advected=p*.82+r*(1.35+uChaotic*.45)+q*.38;
  float broad=atmosphereFbm(advected);
  float folds=atmosphereFbm(advected*vec2(1.7,1.2)+q*.9);
- float weather=atmosphereFbm(p*.48+vec2(7.2,-3.6)+drift*.3);
- float body=broad*.78+folds*.22;
+ // Low-frequency weather opens continuous windows onto the sky; small folds
+ // modulate the surviving banks without filling every gap with fine texture.
+ float weather=atmosphereNoise(p*.52+vec2(7.2,-3.6)+drift*.3);
+ float body=broad*.86+folds*.14;
  float rim=smoothstep(.28,.48,body)*(1.-smoothstep(.52,.73,body));
- body+=(folds-.45)*rim*(.10+uChaotic*.15);
- float base=.31-uDensity*.08;
- float mass=smoothstep(base,.69-uEnergy*.045,body+weather*.10);
- float opening=smoothstep(.21,.46,weather+broad*.19);
- return clamp(pow(mass,1.18)*opening*(.88+uEnergy*.22)+uBass*.025*rim,0.,.96);
+ body+=(folds-.45)*rim*(.08+uChaotic*.10);
+ float base=.35-uDensity*.055;
+ float mass=smoothstep(base,.70-uEnergy*.045,body+weather*.045);
+ float opening=smoothstep(.30-uDensity*.035,.59,weather*.76+broad*.24);
+ return clamp(pow(mass,1.12)*opening*(.90+uEnergy*.20)+uBass*.025*rim*opening,0.,.96);
 }
 float inkAtmosphere(vec2 p,float time){
  float t=time*.85;p=rot(-.21)*p*.66;
@@ -91,14 +95,17 @@ float gasVeil(vec2 p){
 }
 ${starfieldGLSL}
 float atmosphereMaterial(vec2 screen,float t,vec2 sky){
- vec2 p=screen-uGasLayers[0].xy+uGasLayers[0].zw;
+ // Coherent pressure moves the entire gas body with depth parallax; the sky
+ // stays fixed. No local squeeze, expanding UV map, or feedback accumulation.
+ vec2 gasScreen=screen-uGasSurge;
+ vec2 p=gasScreen-uGasLayers[0].xy+uGasLayers[0].zw;
  float field=0.;
  if(uAtmosphere.x>.0001)field+=cloudAtmosphere(p,t)*uAtmosphere.x;
  if(uAtmosphere.y>.0001)field+=inkAtmosphere(p,t)*uAtmosphere.y;
- if(uAtmosphere.z>.0001)field+=nebulaAtmosphere(screen-uNebulaDrift.xy+uGasLayers[0].zw,t)*uAtmosphere.z;
+ if(uAtmosphere.z>.0001)field+=nebulaAtmosphere(gasScreen-uNebulaDrift.xy+uGasLayers[0].zw,t)*uAtmosphere.z;
  if(uAtmosphere.w>.0001)field+=classicMaterial(p,t)*uAtmosphere.w;
- float farDensity=gasVeil((screen-uGasLayers[1].xy+uGasLayers[1].zw)*.67+vec2(13.8,7.2));
- float nearDensity=gasVeil((screen-uGasLayers[2].xy+uGasLayers[2].zw)*1.13+vec2(3.7,19.1));
+ float farDensity=gasVeil((screen-uGasSurge*.55-uGasLayers[1].xy+uGasLayers[1].zw)*.67+vec2(13.8,7.2));
+ float nearDensity=gasVeil((screen-uGasSurge*1.25-uGasLayers[2].xy+uGasLayers[2].zw)*1.13+vec2(3.7,19.1));
  float farAlpha=smoothstep(.49,.79,farDensity)*.26;
  float nearAlpha=smoothstep(.43,.77,nearDensity)*.38*smoothstep(.012,.22,field+farAlpha*.2);
  float bodyAlpha=clamp(field,0.,.97);

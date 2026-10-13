@@ -1,17 +1,20 @@
 import { z } from 'zod';
-import { sceneCount } from './scene-catalog.ts';
+import { availableSceneIndexes, sceneCount } from './scene-catalog.ts';
 
 const unit=z.number().finite().min(0).max(1);
-export const midiTargets=[...Array.from({length:sceneCount},(_,i)=>`scene:${i}` as const),'mix','warmth','richness','energy','chaos','density','motion','morph','complexity','rotation','shuffle:next','shuffle','music:amount','music:impact','music:flow','music:detail','section:steady','section:build','section:release'] as const;
+const parameterTargets=['mix','warmth','richness','energy','chaos','density','motion','morph','complexity','rotation','shuffle:next','shuffle','music:amount','music:impact','music:flow','music:detail','section:steady','section:build','section:release'] as const;
+export const midiTargets=[...availableSceneIndexes.map(index=>`scene:${index}` as const),...parameterTargets] as const;
+// Retired scenes disappear from new mappings, but existing presets still decode unchanged.
+const persistedMidiTargets=[...Array.from({length:sceneCount},(_,i)=>`scene:${i}` as const),...parameterTargets] as const;
 export const isMidiTrigger=(target:string)=>target==='shuffle:next'||target.startsWith('scene:')||target.startsWith('section:');
 export const midiBindingSchema=z.object({
-  target:z.enum(midiTargets),kind:z.enum(['note','cc']),channel:z.number().int().min(1).max(16),number:z.number().int().min(0).max(127),
+  target:z.enum(persistedMidiTargets),kind:z.enum(['note','cc']),channel:z.number().int().min(1).max(16),number:z.number().int().min(0).max(127),
   mode:z.enum(['absolute','relative1','relative2','relative3']).default('absolute'),
   min:unit.default(0),max:unit.default(1),pickup:z.boolean().default(true),
 });
 export const midiSchema=z.object({bindings:z.array(midiBindingSchema).max(32).default([])}).default({bindings:[]});
 export type MidiBinding=z.infer<typeof midiBindingSchema>;
-export type MidiTarget=typeof midiTargets[number];
+export type MidiTarget=typeof persistedMidiTargets[number];
 export type MidiSignal={kind:'note'|'cc';channel:number;number:number;value:number;pressed:boolean};
 export function decodeMidi(data:ArrayLike<number>):MidiSignal|null{
   if(data.length<3)return null;

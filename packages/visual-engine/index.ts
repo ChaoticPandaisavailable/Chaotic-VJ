@@ -10,7 +10,10 @@ import { compositionSeed } from '../shared/shuffle.ts';
 import { VariationState } from './variations.ts';
 import { createGlyphAtlas } from './glyphs.ts';
 import { ParticleCloud } from './particles.ts';
+import { ParticleMusicMotion } from './particle-motion.ts';
 import { FacetComposition } from './facet-composition.ts';
+import { FacetMotion } from './facet-motion.ts';
+import { SceneMotion } from './scene-motion.ts';
 import { SceneBuffer } from './scene-buffer.ts';
 import { moodLabs, hexToLab, labToHex } from '../shared/palette.ts';
 import { ColorJourney,colorCue } from '../shared/color-motion.ts';
@@ -105,6 +108,10 @@ export class VisualEngine {
   get currentStyle(){return this.activeStyle;}
   get transitioning(){return this.deckA.transitioning;}
   private musicForces=new MusicForces();
+  private facetMotion=new FacetMotion();
+  private sceneMotion=new SceneMotion();
+  private particleMusicMotion=new ParticleMusicMotion();
+  private vortexForm=0;
   private musicPcm=new Float32Array(0);
   get musicResponse(){return this.musicForces.value;}
   private drawCount=0;
@@ -132,11 +139,12 @@ export class VisualEngine {
     this.renderer.debug.onShaderError = (_gl, _program, vs, fs) => { this.error = `Shader 编译失败: ${context.getShaderInfoLog(fs) || context.getShaderInfoLog(vs)}`; console.error(this.error); };
     this.blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1); this.blank.needsUpdate = true;
     const u = (value: unknown) => ({ value });
-    const common = { uResolution: u(new THREE.Vector2(1920,1080)), uTime: u(0), uDt: u(1/60), uSeed: u(1337),uNoise:u(this.noiseTexture),uWander:u(new THREE.Vector2()),uMusic:u(new THREE.Vector4()),uMusicRelease:u(0),uMusicGain:u(0),uBeatSeconds:u(.5) };
+    const common = { uResolution: u(new THREE.Vector2(1920,1080)), uTime: u(0), uDt: u(1/60), uSeed: u(1337),uNoise:u(this.noiseTexture),uWander:u(new THREE.Vector2()),uMusic:u(new THREE.Vector4()),uMusicRelease:u(0),uMusicGain:u(0),uBeatSeconds:u(.5),uSceneMusic:u(new THREE.Vector4()),uSceneDrift:u(new THREE.Vector4(0,0,99,0)),uVortexForm:u(0),uSceneImpulseTravel:u(0) };
     this.background = new THREE.ShaderMaterial({ vertexShader: vertex, fragmentShader: fieldFragment, depthTest: false, depthWrite: false, uniforms: { ...common,uResolution:u(new THREE.Vector2()), uHistory:u(this.blank), uEnergy:u(.5),uChaotic:u(0),uAtmosphere:u(this.atmosphere),uChaos:u(.6),uDensity:u(.5),uMemory:u(.65),uFragmentation:u(.5),uMorph:u(.3),uBass:u(0),uMid:u(0),uHigh:u(0),uOnset:u(0),uFlux:u(0),uBeat:u(0),uStyleA:u(0),uStyleB:u(0),uStyleMix:u(0),uGesture:u(1),uAmplitude:u(.7),uScale:u(1.3),uImpact:u(0),uPhrase:u(0) } });
     this.background.uniforms.uSpring=u(0);
     this.background.uniforms.uGasLayers=u(Array.from({length:3},()=>new THREE.Vector4()));
     this.background.uniforms.uGasEvolution=u(0);
+    this.background.uniforms.uGasSurge=u(new THREE.Vector2());
     this.background.uniforms.uNebulaDrift=u(new THREE.Vector4());
     this.background.uniforms.uSkyTime=u(0);this.background.uniforms.uMeteor=u(new THREE.Vector4());this.background.uniforms.uMeteorPath=u(new THREE.Vector4());
     this.background.uniforms.uComplexity=u(.72);this.background.uniforms.uAngle=u(0);this.background.uniforms.uParticles=u(this.blank);
@@ -294,20 +302,23 @@ export class VisualEngine {
   private clearPhotoHistory(){this.clear(this.photos);}
   setPhoto(texture:THREE.Texture|null){ if(this.photoTexture===texture)return;this.photoTexture=texture;this.photoAge=0;this.clearPhotoHistory();this.photo.uniforms.uPhoto.value=texture??this.blank;if(texture){const i=texture.image;this.photo.uniforms.uPhotoSize.value.set(i.width,i.height);this.photo.uniforms.uPhotoAspect.value=i.width/i.height;} }
   setPhotoAge(age:number){this.photoAge=age;}
-  reset(){this.simulationTime=0;this.musicForces.reset();this.gasMotion.reset(this.lastSeed);this.nebulaMotion.reset(this.lastSeed);this.starfield.reset(this.lastSeed);this.variation.reset();this.clearBackground();this.clearPhotoHistory();}
+  reset(){this.simulationTime=0;this.musicForces.reset();this.facetMotion.reset(this.lastSeed);this.sceneMotion.reset();this.particleMusicMotion.reset();this.gasMotion.reset(this.lastSeed);this.nebulaMotion.reset(this.lastSeed);this.starfield.reset(this.lastSeed);this.variation.reset();this.clearBackground();this.clearPhotoHistory();}
   render(dt:number,config:Config,audio:AudioFeatures,transport:Transport,beat:number,pcm?:PcmFrame|null,sharedColorPhase?:number,bpm=config.tempo.bpm){
     dt=Math.min(Math.max(dt,0),.1);
     const paused=transport.freeze||transport.blackout,seed=compositionSeed(config);
     // Queue state changes while frozen, so resetting buffers cannot flash a blank frame.
     const reset=this.flowReset.update(dt,seed,transport.clearVersion,paused);
     if(reset==='composition'){this.lastSeed=this.flowReset.seed;this.reset();}
-    if(reset==='history'){this.musicForces.reset();this.gasMotion.reset(this.lastSeed);this.nebulaMotion.reset(this.lastSeed);this.clearBackground();this.clearPhotoHistory();}
+    if(reset==='history'){this.musicForces.reset();this.facetMotion.reset(this.lastSeed);this.sceneMotion.reset();this.particleMusicMotion.reset();this.gasMotion.reset(this.lastSeed);this.nebulaMotion.reset(this.lastSeed);this.clearBackground();this.clearPhotoHistory();}
     const factor=1-Math.exp(-dt/ .5);
     // Keep the outgoing scene's controls stable while an unseen destination is preparing.
     if(config.field.style===this.activeStyle)for(const key of this.macroKeys)this.values[key]+=(config.macros[key]-this.values[key])*factor;
     for(const key of ['depth','shadow','light','morph','chaotic','lightAngle'] as const)this.look[key]+=(config.look[key]-this.look[key])*factor;
     const m=this.values,mod=config.modulation;
     const music=this.musicForces.update(dt,audio,config.music,bpm,paused);
+    const facetPlanes=this.facetMotion.update(dt,music,paused);
+    this.sceneMotion.update(dt,music,paused);
+    const petalWeights=this.particleMusicMotion.update(dt,this.sceneMotion.drift,paused);
     let drivenPcm=pcm;
     if(pcm){
       if(this.musicPcm.length!==pcm.samples.length)this.musicPcm=new Float32Array(pcm.samples.length);
@@ -365,17 +376,23 @@ export class VisualEngine {
     const gas=this.gasMotion.update(dt,music,config,paused);
     for(let i=0;i<3;i++)b.uGasLayers.value[i].fromArray(gas[i]);
     b.uGasEvolution.value=this.gasMotion.evolution;
+    b.uGasSurge.value.fromArray(this.gasMotion.surge);
     this.nebulaMotion.update(dt,m.motion,this.gasMotion.audioSpeed[0],paused);b.uNebulaDrift.value.fromArray(this.nebulaMotion.values);
     this.starfield.update(dt,paused);b.uSkyTime.value=this.starfield.time;
     b.uMeteor.value.fromArray(this.starfield.meteor);b.uMeteorPath.value.fromArray(this.starfield.path);
     b.uWander.value.set(0,0);
     b.uMusic.value.set(music.flow*mod.bass/.7,music.detail*mod.high/.5,music.shear*mod.mid/.4,music.pressure);
     b.uMusicRelease.value=music.release;b.uMusicGain.value=music.gain;
+    b.uSceneMusic.value.fromArray(this.sceneMotion.music);b.uSceneDrift.value.fromArray(this.sceneMotion.drift);
+    b.uSceneImpulseTravel.value=this.sceneMotion.impulseTravel;
+    const formTarget=['spiral','wind','binary'].indexOf(config.variation.vortexForm??'spiral');
+    if(!paused)this.vortexForm+=(formTarget-this.vortexForm)*(1-Math.exp(-dt/Math.max(.3,config.variation.transitionSeconds*.22)));
+    b.uVortexForm.value=Math.abs(this.vortexForm-formTarget)<.001?formTarget:this.vortexForm;
     b.uTime.value=this.simulationTime;b.uDt.value=dt;b.uSeed.value=this.lastSeed;
     b.uEnergy.value=m.energy;b.uChaos.value=m.chaos;b.uDensity.value=m.density;b.uMemory.value=m.memory;b.uFragmentation.value=m.fragmentation;b.uMorph.value=m.morph;
     const field=this.activeField;
     b.uGesture.value=['flow','sweep','collision','surge','split','orbit'].indexOf(field.gesture);b.uAmplitude.value=field.amplitude;b.uScale.value=field.scale;
-    // Audio moves independent gas layers only. Other styles keep their own animation.
+    // Each material consumes its own spatial music controls; keep the old global warp neutral.
     b.uImpact.value=0;b.uSpring.value=0;b.uPhrase.value=0;
     b.uBass.value=0;b.uMid.value=0;b.uHigh.value=0;b.uOnset.value=0;b.uFlux.value=0;b.uBeat.value=0;
     const gl=this.renderer.getContext() as WebGL2RenderingContext;const timer=this.gpuExtension;
@@ -406,8 +423,8 @@ export class VisualEngine {
         }
         if(shape.style===9||shape.style===10){
           this.particleTarget??=new THREE.WebGLRenderTarget(deck.width,deck.height,{format:THREE.RedFormat,type:this.fieldType,depthBuffer:false,stencilBuffer:false,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
-          if(shape.style===9){this.particles??=new ParticleCloud(this.glyphs);this.particles.render(this.renderer,this.particleTarget,driftState,this.simulationTime,0,0,shape.scale*b.uComposition.value.w,this.lastSeed);}
-          else{this.facets??=new FacetComposition();this.facets.render(this.renderer,this.particleTarget,driftState,this.simulationTime,0,{...shape,scale:shape.scale*b.uComposition.value.w},{...macros,morph:b.uMorph.value},this.lastSeed,v,amount);}
+          if(shape.style===9){this.particles??=new ParticleCloud(this.glyphs);this.particles.render(this.renderer,this.particleTarget,driftState,this.simulationTime,0,0,shape.scale*b.uComposition.value.w,this.lastSeed,this.sceneMotion.music,this.sceneMotion.drift,petalWeights);}
+          else{this.facets??=new FacetComposition();this.facets.render(this.renderer,this.particleTarget,driftState,this.simulationTime,0,{...shape,scale:shape.scale*b.uComposition.value.w},{...macros,morph:b.uMorph.value},this.lastSeed,v,amount,facetPlanes);}
           b.uParticles.value=this.particleTarget.texture;
         }
         b.uHistory.value=retiring?deck.retiringPrevious:deck.previous;b.uHistoryValid.value=retiring||deck.historyValid?1:0;

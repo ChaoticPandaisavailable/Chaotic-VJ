@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "start": "tsx apps/upload-server/index.ts --production",
     "check": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "audio:benchmark": "tsx scripts/benchmark-transients.ts"
   },
   "dependencies": {
     "butterchurn": "2.6.7",

@@ -13,3 +13,5 @@ export const originalSceneCount=11;
 export const sceneCount=originalSceneCount+milkdropScenes.length;
 export const maxSceneId=sceneCount-1;
 export const isMilkdropStyle=(style:number)=>style>=originalSceneCount&&style<=maxSceneId;
+/** Visible scene choices use original preset indexes so saved A/B and MIDI mappings stay valid. */
+export const availableSceneIndexes=[0,1,2,3,4,9] as const;

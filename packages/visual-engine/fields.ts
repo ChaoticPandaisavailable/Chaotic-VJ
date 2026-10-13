@@ -18,9 +18,14 @@ uniform float uRevealMix,uRevealSide,uRevealStrength;
 uniform float uComplexity,uAngle;
 uniform vec4 uComposition,uAtmosphere;
 uniform vec4 uMusic;
+// Scene-specific musical roles: flow/detail/impact/shear, then bass travel,
+// long kick release, seconds since the real onset, measured kick strength.
+uniform vec4 uSceneMusic,uSceneDrift;
+uniform float uSceneImpulseTravel;
 uniform float uMusicRelease;
 uniform float uStructuralWarp,uVolumeSteps;
 uniform vec4 uGasLayers[3];
+uniform vec2 uGasSurge;
 uniform vec4 uNebulaDrift;
 uniform float uGasEvolution;
 uniform float uSkyTime;

@@ -1,4 +1,5 @@
 import { scenePresets, type Config } from '../../../packages/shared/config.ts';
+import { availableSceneIndexes } from '../../../packages/shared/scene-catalog.ts';
 import { decodeMidi, MidiControl, midiTargets, isMidiTrigger, type MidiBinding, type MidiTarget } from '../../../packages/shared/midi.ts';
 import { applyControl, controlValue } from '../../../packages/shared/performance.ts';
 
@@ -9,8 +10,8 @@ const modes=[['absolute','绝对值'],['relative1','相对 1'],['relative2','相
 const options=modes.map(([v,n])=>`<option value="${v}">${n}</option>`).join('');
 
 export function mountMidi(app:HTMLElement,getConfig:()=>Config,changed:()=>void){
-  app.querySelector('.primary-scenes')!.insertAdjacentHTML('afterend',`<details class="explorations performance-panel"><summary>演奏 <span class="midi-summary">MIDI · A/B</span></summary><div class="performance-body">
-    <div class="deck-selectors"><span class="deck-a">A · 当前视觉</span><label>B <select id="scene-b" aria-label="B 视觉">${scenePresets.map((p,i)=>`<option value="${i}">${p.name}</option>`).join('')}</select></label><label class="mix-toggle"><input type="checkbox" id="mix-enabled"/>混合</label></div>
+  app.querySelector('[data-panel=live]')!.insertAdjacentHTML('beforeend',`<details class="explorations performance-panel"><summary>演奏 <span class="midi-summary">MIDI · A/B</span></summary><div class="performance-body">
+    <div class="deck-selectors"><span class="deck-a">A · 当前视觉</span><label>B <select id="scene-b" aria-label="B 视觉">${availableSceneIndexes.map(i=>`<option value="${i}">${scenePresets[i].name}</option>`).join('')}</select></label><label class="mix-toggle"><input type="checkbox" id="mix-enabled"/>混合</label></div>
     <label class="crossfader"><span>A</span><input type="range" id="scene-mix" aria-label="A B 混合" min="0" max="1" step=".001"/><span>B</span><output id="mix-value">0%</output></label>
     <div class="midi-connect"><button id="midi-connect">连接 MiniLab / MIDI</button><select id="midi-device" aria-label="MIDI 输入设备" hidden></select></div><p class="fine midi-status" role="status">USB 连接 MiniLab MkII，再点连接。无需固定的键盘预设。</p>
     <details class="midi-learn"><summary>映射与旋钮范围 <span id="midi-count">0</span></summary><div class="learn-row"><select id="midi-target" aria-label="MIDI 映射目标">${midiTargets.map(t=>`<option value="${t}">${label(t)}</option>`).join('')}</select><select id="midi-mode" aria-label="旋钮编码模式">${options}</select><button id="midi-learn">学习</button></div><p class="fine">选目标 → 学习 → 按一下打击垫或转动旋钮。旋钮模式与 Arturia MIDI Control Center 中的设置一致。</p><div id="midi-bindings"></div><p class="fine">绝对值旋钮默认等到经过当前值才接管。范围为 0–100%，起止反过来可反向控制。映射随预设保存。</p></details>

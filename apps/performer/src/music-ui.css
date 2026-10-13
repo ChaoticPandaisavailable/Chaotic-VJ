@@ -12,3 +12,4 @@
 .music-sections button[aria-pressed=true],.music-sections button.active{background:#303c25;color:#dceabb;border-color:#6b8050}
 .music-calibration{margin-top:16px}.music-calibration summary{font-size:11px;color:#969d8c;cursor:pointer}.music-align{margin:12px 0;font-size:12px;border:1px solid #414c36;padding:6px 12px}
 .music-panel button:focus-visible,.music-panel summary:focus-visible{outline:2px solid #c9dc91;outline-offset:3px}
+.detection-status{min-height:2.8em;margin:8px 0 16px;font-variant-numeric:tabular-nums}

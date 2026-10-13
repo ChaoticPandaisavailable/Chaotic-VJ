@@ -12,6 +12,11 @@ float cloud3(vec3 p){
 }
 float volumeMaterial(vec2 screen,float style,float time){
  float t=time*.18;
+ float bassTravel=uSceneDrift.x;
+ float pressure=clamp(uSceneDrift.y,0.,1.5);
+ float treble=clamp(uSceneMusic.y,0.,1.5);
+ float kickAge=max(0.,uSceneDrift.z);
+ float kickStrength=clamp(uSceneDrift.w,0.,1.5);
  vec3 ro=vec3(sin(t*.17)*.35,.1,-3.8);
  vec3 rd=normalize(vec3(screen*.58,1.9));
  rd.xz=rot(sin(t*.12)*.15)*rd.xz;
@@ -22,25 +27,55 @@ float volumeMaterial(vec2 screen,float style,float time){
    float distance=1.1+(float(i)+.5)*4.9/uVolumeSteps;
    vec3 local=ro+rd*distance;
    vec3 p=local;
+   vec3 stormTravel=vec3(0.);
+   if(style<7.5){
+     // Transport internal weather at depth-dependent rates. The cumulative
+     // kick travel keeps its position as pressure releases, without recoil.
+     float depthWeight=.7+.3*sin(local.z*.9+.7);
+     stormTravel=vec3(.105,.035,-.085)*bassTravel;
+     stormTravel.xy+=vec2(.34,-.13)*uSceneImpulseTravel*depthWeight;
+     stormTravel.z+=sin(local.x*.72+local.z*.46)*uSceneImpulseTravel*.18;
+   }else{
+     // One measured attack launches a wave in both directions along the
+     // ribbons. Its moving window dies away; time alone cannot launch it.
+     float along=abs(local.x+local.z*.38);
+     float front=kickAge*2.2;
+     float waveDistance=(along-front)/.65;
+     float wave=exp(-waveDistance*waveDistance)*sin(along*6.2-kickAge*11.);
+     wave*=kickStrength*exp(-kickAge/.85);
+     p.y+=wave*.22;
+     p.x+=wave*.075*sin(local.y*1.3+local.z*.6);
+     p+=vec3(.024,-.018,.055)*bassTravel;
+   }
    float radius=length(p.xy);
    p.xy=rot(t*.32+radius*(.45+uChaos*.3)+p.z*.18)*p.xy;
    p.z+=t*.24;
    vec3 drift=vec3(sin(p.y*.9+t),cos(p.z*.7-t*.63),sin(p.x*.8+t*.37));
-   vec3 q=p+drift*(.28+uChaos*.4+uBass*.12);
+   vec3 q=p+drift*(.28+uChaos*.4);
    float density=0.,shade=0.;
    if(style<7.5){
+     q+=stormTravel;
      float clouds=cloud3(q*1.18+vec3(t*.16,0.,-t*.12));
      float whorls=noise3(q*.62+4.2);
      density=smoothstep(.56-uDensity*.07,.72,clouds+whorls*.12);
-     density*=exp(-dot(p.xy,p.xy)*.045);
+     // The viewing envelope belongs to the fixed volume, never to the
+     // travelling noise coordinates: long performances cannot drift empty.
+     density*=exp(-dot(local.xy,local.xy)*.045);
      float layer=local.z-.55*sin(local.x*1.2+t*.2)-.45*cos(local.y*1.3-t*.15);
      density*=exp(-layer*layer*.45);
      float illumination=noise3(q*1.18+vec3(.6,.9,-.7));
      shade=.15+.65*smoothstep(.18,.84,illumination);
+     // Light leaks through dense banks on the long kick release; treble
+     // catches only the thin bright edges, never the entire sky at once.
+     shade+=pressure*(.07+.12*illumination)*smoothstep(.06,.42,density);
+     float silver=smoothstep(.57,.86,illumination)*smoothstep(.57,.74,clouds);
+     shade+=treble*silver*.22;
    }else{
      // Rotate a continuous four-dimensional field through x/w and y/w planes.
      vec4 v=vec4(q,cos(t*.31)*.9);
-     v.xw=rot(t*.37)*v.xw;v.yw=rot(t*.23+.7)*v.yw;v.zw=rot(t*.17)*v.zw;
+     v.xw=rot(t*.37+bassTravel*.075)*v.xw;
+     v.yw=rot(t*.23+.7-bassTravel*.045)*v.yw;
+     v.zw=rot(t*.17)*v.zw;
      v*=2.1+uMorph*.8;
      float manifold=sin(v.x)*cos(v.y)+sin(v.y)*cos(v.z)+sin(v.z)*cos(v.w);
      float filaments=exp(-abs(manifold)*mix(5.5,11.,uFragmentation));
@@ -51,6 +86,10 @@ float volumeMaterial(vec2 screen,float style,float time){
      density*=exp(-layer*layer*.8);
      density+=smoothstep(.6,.85,cloud3(q*.8))*.025;
      shade=.42+.58*noise3(q*.7+vec3(0.,1.,-1.));
+     // Cymbals pick out particular silk threads instead of changing width
+     // or turning the whole folded surface into a flash.
+     float threadGlint=filaments*pow(fine,3.);
+     shade+=treble*threadGlint*.32;
    }
    float alpha=1.-exp(-density*(.22+uEnergy*.13)*20./uVolumeSteps);
    light+=transmittance*alpha*shade;

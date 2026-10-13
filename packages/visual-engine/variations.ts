@@ -14,7 +14,8 @@ export class VariationState {
   update(dt:number,config:Config['variation'],paused=false){
     if(paused)return;
     const h=Math.max(0,Math.min(.1,dt)),a=1-Math.exp(-h*4/config.transitionSeconds);
-    const mode=surfaceNames.indexOf(config.surface);
+    // Slot 3 remains reserved for old presets; contours now render continuously.
+    const mode=surfaceNames.indexOf(config.surface==='contours'?'fluid':config.surface);
     for(let i=0;i<this.weights.length;i++)this.weights[i]+=((i===mode?1:0)-this.weights[i])*a;
     this.phase+=h*(.055+config.evolution*.2);
     const breath=.5+.5*Math.sin(this.phase);

@@ -48,13 +48,19 @@ float starLayer(vec2 p,float grid,float threshold,float salt){
  vec2 center=.22+.56*hash2(cell+salt+19.);
  float character=hash(cell+salt+41.),phase=hash(cell+salt+57.);
  float pixel=grid/uResolution.y;
- float radius=mix(.65,1.2,character)*pixel*max(1.,uResolution.y/1080.);
- float spark=1.-smoothstep(max(0.,radius-pixel*.65),radius+pixel*.65,length(local-center));
- float idle=.78+.14*sin(uSkyTime*(.7+character*1.6)+phase*31.)+.08*sin(uSkyTime*.41+phase*47.);
- // Independent phases select only a few stars for each measured high-frequency pulse.
+ float distance=length(local-center),prominence=smoothstep(.88,.995,character);
+ float idle=.83+.11*sin(uSkyTime*(.7+character*1.3)+phase*31.)+.06*sin(uSkyTime*.41+phase*47.);
+ // MusicForces already gives treble a 35 ms attack / 100 ms release. Reuse it
+ // for a small breathing core; independent phases prevent a whole-sky flash.
  float selected=pow(.5+.5*sin(uSkyTime*(1.8+phase*2.2)+character*61.),8.);
- float response=clamp(uMusic.y*4.,0.,1.)*selected*(.25+character*.60);
- return spark*min(.94,mix(.22,.65,phase)*idle+response);
+ float response=clamp(uMusic.y*4.,0.,1.)*selected;
+ float radius=(mix(.48,.96,character*character)+prominence*.30)*pixel*max(1.,uResolution.y/1080.);
+ radius*=1.+response*.24;
+ float core=1.-smoothstep(max(0.,radius-pixel*.6),radius+pixel*.6,distance);
+ // A small minority have soft halos. Fine stars retain a crisp, quiet core.
+ float halo=exp(-2.*pow(distance/max(radius*2.5,pixel),2.))*prominence*.13;
+ float light=(mix(.20,.56,phase)+prominence*.15)*idle+response*(.16+prominence*.13);
+ return min(.95,core*light+halo*(1.+response*.55));
 }
 float meteorLight(vec2 sky){
  if(uMeteor.z<.0001)return 0.;
@@ -70,6 +76,6 @@ float meteorLight(vec2 sky){
 }
 float gasStars(vec2 sky){
  // Shared by all four gas atmospheres; always behind the density layers.
- return min(.97,starLayer(sky,52.,.986,71.)+starLayer(sky+vec2(3.7,8.2),83.,.997,127.)*.6+meteorLight(sky));
+ return min(.97,starLayer(sky,52.,.986,71.)+starLayer(sky+vec2(3.7,8.2),97.,.995,127.)*.43+meteorLight(sky));
 }
 `;

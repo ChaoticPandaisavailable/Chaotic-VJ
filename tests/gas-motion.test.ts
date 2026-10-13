@@ -17,12 +17,13 @@ test('gas sheets stay finite and continuous through 30 minutes of maximum live f
   const loud=response({impact:1,flow:1,detail:1,shear:1,release:1,pressure:1});
   for(let frame=0;frame<30*60*60;frame++){
     flow.update(1/60,loud,defaultConfig);
+    assert.ok(Math.hypot(...flow.surge)<=.600001,'coherent pressure cannot push the finite nebula out of view');
     assert.ok(Math.hypot(flow.layers[0][0],flow.layers[0][1])<=1.400001,'main nebula cannot drift beyond the standard viewport half-height of 1.6');
     for(let i=0;i<3;i++){
       const l=flow.layers[i];assert.ok(l.every(Number.isFinite));
       assert.ok(Math.abs(l[0])<=gasLayerSettings[i].radius*2&&Math.abs(l[1])<=gasLayerSettings[i].radius*2);
       assert.ok(Math.hypot(l[0]-previous[i][0],l[1]-previous[i][1])<.04,'phase wrapping cannot jump the image');
-      assert.ok(Math.hypot(l[2],l[3])<.01,'acoustic tremor stays small');
+      assert.ok(Math.hypot(l[2],l[3])<.01,'original small tremor stays bounded');
       previous[i]=[...l];
     }
   }
@@ -66,7 +67,7 @@ test('audio strength drives wind promptly, without a BPM-generated tremor',()=>{
     const quick=flow.audioSpeed[0];
     for(let i=0;i<120;i++)flow.update(1/60,forces.update(1/60,{...silentFeatures(),rms:.3,bass},config.music,135),config);
     const sustained=flow.audioSpeed[0];assert.ok(quick>sustained*.45);
-    assert.ok(flow.layers.some(l=>Math.abs(l[2])+Math.abs(l[3])>.0001));
+    assert.ok(flow.layers.every(l=>l[2]===0&&l[3]===0),'sustained bass drives wind without vibration');
     for(let i=0;i<180;i++)flow.update(1/60,forces.update(1/60,{...silentFeatures(),rms:.3,high:.8},config.music,135),config);
     assert.ok(flow.audioSpeed[0]<sustained*.001,'bass exit stops its wind even while treble continues');
     assert.ok(flow.layers.every(l=>Math.abs(l[2])+Math.abs(l[3])<.000001));
@@ -75,6 +76,52 @@ test('audio strength drives wind promptly, without a BPM-generated tremor',()=>{
   const runs=[65,120,180].map(bpm=>{
     const music=new MusicForces(),flow=make();for(let i=0;i<360;i++)flow.update(1/60,music.update(1/60,i<120?{...silentFeatures(),rms:.3,bass:.5,kick:i%37===0?.6:0}:silentFeatures(),config.music,bpm),config);return flow.layers;
   });assert.deepEqual(runs[0],runs[1]);assert.deepEqual(runs[1],runs[2]);
+});
+
+test('kick alone excites a bounded tremor, which stops while bass keeps flowing',()=>{
+  const gas=make();gas.update(1/60,response({impact:.5}),defaultConfig);
+  assert.ok(gas.layers.some(l=>Math.hypot(l[2],l[3])>.0001));
+  for(let i=0;i<180;i++)gas.update(1/60,response({flow:.5}),defaultConfig);
+  assert.ok(gas.audioSpeed[0]>0);assert.ok(gas.layers.every(l=>l[2]===0&&l[3]===0));
+});
+
+test('broad kick pressure continues through release without recoil or bass-generated pushes',()=>{
+  const gas=make();
+  for(let i=0;i<120;i++)gas.update(1/60,response({flow:1}),defaultConfig);
+  assert.deepEqual(gas.surge,[0,0],'bass alone cannot create pressure strikes');
+  for(let i=0;i<12;i++)gas.update(1/120,response({flow:1,impact:.85}),defaultConfig);
+  const atAttack=Math.hypot(...gas.surge),direction=[...gas.surge],frozen=[...gas.surge];
+  gas.update(.1,response({impact:1}),defaultConfig,true);assert.deepEqual(gas.surge,frozen);
+  let atQuarter=0,atTail=0,last=[...gas.surge];
+  for(let i=0;i<360;i++){
+    gas.update(1/120,response({flow:1}),defaultConfig);
+    const step=gas.surge.map((v,j)=>v-last[j]);
+    assert.ok(step[0]*direction[0]+step[1]*direction[1]>=-1e-12,'release advances rather than snapping back');
+    if(i===17)atQuarter=Math.hypot(...gas.surge);
+    if(i===71)atTail=Math.hypot(...gas.surge);
+    last=[...gas.surge];
+  }
+  assert.ok(atQuarter>atAttack*2,'pressure carries the body well past the short audio attack');
+  assert.ok(atTail>atQuarter*1.25,'release remains visible for roughly half a second');
+  assert.ok(Math.hypot(...gas.surge)-atTail<.016,'tail settles instead of sustained bass holding the strike');
+  assert.ok(Math.hypot(...gas.surge)>.1,'the coherent displacement is much wider than the tiny tremor');
+  const stopped=[...gas.surge];for(let i=0;i<240;i++)gas.update(1/60,response({}),defaultConfig);
+  assert.ok(Math.hypot(...gas.surge.map((v,j)=>v-stopped[j]))<.00001);
+  gas.reset(1337);assert.deepEqual(gas.surge,[0,0]);
+});
+
+test('broad pressure retains kick strength and agrees across display rates',()=>{
+  const run=(hz:number,impact:number)=>{
+    const gas=make();
+    for(const [seconds,force] of [[.1,impact],[2,0]]){
+      let t=0;while(t<seconds-1e-10){const dt=Math.min(1/hz,seconds-t);gas.update(dt,response({impact:force}),defaultConfig);t+=dt;}
+    }
+    return gas.surge;
+  };
+  const runs=[30,60,144].map(hz=>run(hz,.8));
+  for(const position of runs)assert.ok(Math.hypot(...position.map((v,i)=>v-runs[0][i]))<1e-9);
+  const ratio=Math.hypot(...run(120,.8))/Math.hypot(...run(120,.4));
+  assert.ok(ratio>1.95&&ratio<2.05,'filtered/quiet kicks must retain weaker pressure');
 });
 
 test('bass advances internal gas growth monotonically; freeze and silence cannot cause recoil',()=>{

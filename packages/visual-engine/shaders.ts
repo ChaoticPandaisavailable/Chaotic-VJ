@@ -92,15 +92,11 @@ float surfaceValue(float value,vec2 sampleUV){
   float dotMask=1.-smoothstep(radius-.055,radius+.055,length(local-.5));
   float dotValue=dotMask*(.3+sampleValue*.68)*smoothstep(.01,.065,sampleValue)+value*.055;
   float pixelValue=sampleValue*(1.-smoothstep(.455,.5,max(abs(local.x-.5),abs(local.y-.5)))*.1);
-  float bands=value*(7.+uComplexity*21.);
-  float aa=clamp(fwidth(bands),.025,.35);
-  float line=1.-smoothstep(.055,.055+aa,abs(fract(bands)-.5));
-  float contourValue=line*(.32+value*.65)*smoothstep(.018,.1,value);
   float asciiValue=0.,hanziValue=0.;
   vec2 symbolUV=vec2(local.x,1.-local.y);
   if(uSurface[4]>.001)asciiValue=glyphMask(8.+floor(clamp(sampleValue,0.,.99)*55.),symbolUV)*(.38+sampleValue*.6)*smoothstep(.015,.11,sampleValue);
   if(uSurface[5]>.001)hanziValue=glyphMask(64.+floor(hash(cell+13.)*64.),symbolUV)*(.38+sampleValue*.6)*smoothstep(.025,.15,sampleValue);
-  float expression=value*uSurface[0]+dotValue*uSurface[1]+pixelValue*uSurface[2]+contourValue*uSurface[3]+asciiValue*uSurface[4]+hanziValue*uSurface[5];
+  float expression=value*(uSurface[0]+uSurface[3])+dotValue*uSurface[1]+pixelValue*uSurface[2]+asciiValue*uSurface[4]+hanziValue*uSurface[5];
   return mix(expression,value,uParticleMix);
 }
 void main(){

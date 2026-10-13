@@ -63,7 +63,13 @@ export class MusicForces {
     // A short attack avoids a one-frame shape jump when the performer releases pressure.
     this.release=smooth(this.release,this.releaseTarget,dt,.065,.25);
     this.releaseTarget*=Math.exp(-dt/1.05);
-    const impact=this.kickStrength*(1-Math.exp(-this.kickAge/.05))*Math.exp(-this.kickAge/.17)*audible;
+    // Detection chooses when to strike; measured <200 Hz energy (80 Hz emphasis)
+    // chooses how hard. A confident but quiet onset must not become a heavy blow.
+    // Keep the early energy window open: a 12 ms vs 35 ms detection must not
+    // attenuate identical drums differently. This adds no look-ahead latency.
+    const impact=audio.lowImpact===undefined
+      ?this.kickStrength*(1-Math.exp(-this.kickAge/.05))*Math.exp(-this.kickAge/.17)*audible
+      :clamp(audio.lowImpact)*(1-Math.exp(-this.kickAge/.006))*Math.exp(-Math.max(0,this.kickAge-.085)/.07)*audible;
     const gain=this.influence;
     this.value={kick:kick*music.impact,strike:(audio.snare??0)*music.impact*audible,spark:(audio.hat??0)*music.detail*audible,gain,impact:impact*gain*music.impact,flow:this.body*gain*music.flow*audible,detail:this.edge*gain*music.detail*audible,shear:this.shear*gain*music.impact*audible,pressure:this.pressure*gain,release:this.release*gain,activity:clamp(audio.rms*6)*gain};
     return this.value;

@@ -4,7 +4,7 @@ import type { SavedPreset } from '../../../packages/shared/saved-presets.ts';
 import { api,download,toast } from './api.ts';
 
 export function mountPresetLibrary(app:HTMLElement,getConfig:()=>Config,load:(config:Config)=>void){
-  app.querySelector('[data-panel="color"]')!.insertAdjacentHTML('afterbegin',`<section class="preset-library" aria-label="我的预设"><span class="eyebrow">我的预设</span><div class="preset-recall"><select id="saved-presets" aria-label="已保存预设"><option value="">选择预设</option></select><button id="recall-preset">载入</button></div><input id="preset-name" aria-label="预设名称" placeholder="给这组颜色与纹理起个名字" maxlength="60"/><div class="preset-buttons"><button id="save-new-preset" class="outline">存为新预设</button><button id="update-preset" disabled>更新选中</button><button id="export-preset">导出 JSON</button></div><p class="fine">保存颜色、Chaotic、打光及演奏设置；重启后仍在。</p></section>`);
+  app.querySelector('[data-panel="live"]')!.insertAdjacentHTML('afterbegin',`<section class="preset-library" aria-label="我的预设"><span class="eyebrow">我的预设</span><div class="preset-recall"><select id="saved-presets" aria-label="已保存预设"><option value="">选择预设</option></select><button id="recall-preset">载入</button></div><input id="preset-name" aria-label="预设名称" placeholder="给这组颜色与纹理起个名字" maxlength="60"/><div class="preset-buttons"><button id="save-new-preset" class="outline">存为新预设</button><button id="update-preset" disabled>更新选中</button><button id="export-preset">导出 JSON</button></div><p class="fine">保存颜色、Chaotic、打光及演奏设置；重启后仍在。</p></section>`);
   const select=app.querySelector<HTMLSelectElement>('#saved-presets')!,name=app.querySelector<HTMLInputElement>('#preset-name')!;
   const save=app.querySelector<HTMLButtonElement>('#save-new-preset')!,update=app.querySelector<HTMLButtonElement>('#update-preset')!,recall=app.querySelector<HTMLButtonElement>('#recall-preset')!;
   let entries:SavedPreset[]=[],busy=false;
@@ -24,5 +24,5 @@ export function mountPresetLibrary(app:HTMLElement,getConfig:()=>Config,load:(co
   name.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();void store(false);}};
   app.querySelector<HTMLButtonElement>('#export-preset')!.onclick=()=>download(new Blob([JSON.stringify(getConfig(),null,2)],{type:'application/json'}),`chaotic-preset-${Date.now()}.json`);
   void refresh().catch(error=>toast(`预设库读取失败：${error.message}`));
-  return {open(){app.querySelector<HTMLButtonElement>('[data-tab="color"]')!.click();app.querySelector('.preset-library')!.scrollIntoView({block:'nearest'});name.focus();void refresh().catch(error=>toast(error.message));}};
+  return {open(){app.querySelector<HTMLButtonElement>('[data-tab="live"]')!.click();app.querySelector('.preset-library')!.scrollIntoView({block:'nearest'});name.focus();void refresh().catch(error=>toast(error.message));}};
 }
