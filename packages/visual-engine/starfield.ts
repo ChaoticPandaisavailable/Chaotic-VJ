@@ -1,5 +1,8 @@
 import { clamp, smoothstep } from '../shared/config.ts';
 
+/** These spatial materials receive a separate sky after history/lighting. */
+export const hasBackdropStars=(style:number)=>[4,7,8,9,10].includes(style);
+
 /** A quiet sky clock, independent of the audio-driven gas clock. One meteor at a time. */
 export class StarfieldMotion {
   time=0;
@@ -41,7 +44,7 @@ export class StarfieldMotion {
 }
 
 export const starfieldGLSL=/* glsl */`
-float starLayer(vec2 p,float grid,float threshold,float salt){
+float starLayer(vec2 p,float grid,float threshold,float salt,float size){
  vec2 cell=floor(p*grid),local=fract(p*grid);
  float identity=hash(cell+salt);
  if(identity<threshold)return 0.;
@@ -54,13 +57,15 @@ float starLayer(vec2 p,float grid,float threshold,float salt){
  // for a small breathing core; independent phases prevent a whole-sky flash.
  float selected=pow(.5+.5*sin(uSkyTime*(1.8+phase*2.2)+character*61.),8.);
  float response=clamp(uMusic.y*4.,0.,1.)*selected;
- float radius=(mix(.48,.96,character*character)+prominence*.30)*pixel*max(1.,uResolution.y/1080.);
+ float radius=(mix(.72,1.5,character*character)+prominence*.60)*size*pixel*max(1.,uResolution.y/1080.);
  radius*=1.+response*.24;
  float core=1.-smoothstep(max(0.,radius-pixel*.6),radius+pixel*.6,distance);
  // A small minority have soft halos. Fine stars retain a crisp, quiet core.
- float halo=exp(-2.*pow(distance/max(radius*2.5,pixel),2.))*prominence*.13;
- float light=(mix(.20,.56,phase)+prominence*.15)*idle+response*(.16+prominence*.13);
- return min(.95,core*light+halo*(1.+response*.55));
+ float halo=exp(-2.*pow(distance/max(radius*2.8,pixel),2.))*prominence*.19;
+ vec2 ray=abs(local-center);
+ float rays=(exp(-ray.x/max(radius*.16,pixel*.3)-ray.y/(radius*3.5))+exp(-ray.y/max(radius*.16,pixel*.3)-ray.x/(radius*3.5)))*prominence*.075;
+ float light=(mix(.38,.74,phase)+prominence*.17)*idle+response*(.18+prominence*.13);
+ return min(.97,core*light+(halo+rays)*(1.+response*.55));
 }
 float meteorLight(vec2 sky){
  if(uMeteor.z<.0001)return 0.;
@@ -75,7 +80,7 @@ float meteorLight(vec2 sky){
  return min(.95,(tail*.72+head*.75)*uMeteor.z);
 }
 float gasStars(vec2 sky){
- // Shared by all four gas atmospheres; always behind the density layers.
- return min(.97,starLayer(sky,52.,.986,71.)+starLayer(sky+vec2(3.7,8.2),97.,.995,127.)*.43+meteorLight(sky));
+ // Three size populations: many fine stars, medium stars and a few foreground beacons.
+ return min(.97,starLayer(sky,52.,.958,71.,1.2)+starLayer(sky+vec2(3.7,8.2),97.,.982,127.,.84)*.67+starLayer(sky+vec2(8.1,2.4),23.,.975,301.,2.1)+meteorLight(sky));
 }
 `;

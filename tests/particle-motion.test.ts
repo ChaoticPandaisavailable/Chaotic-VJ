@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ParticleMusicMotion,particleCycleDuration,sampleParticleCycle,sampleParticleKick } from '../packages/visual-engine/particle-motion.ts';
 
-test('particle phrase opens, unfurls and gathers in a repeating bounded sequence',()=>{
+test('particle curvature clock repeats in a bounded sequence',()=>{
   assert.deepEqual(Array.from(sampleParticleCycle(0,0)).slice(0,3),[1,0,0]);
   assert.deepEqual(Array.from(sampleParticleCycle(8,0)).slice(0,3),[0,1,0]);
   assert.deepEqual(Array.from(sampleParticleCycle(16,0)).slice(0,3),[0,0,1]);
@@ -37,7 +37,7 @@ test('sampling at the same visual time is deterministic across refresh rates and
   assert.notDeepEqual(Array.from(sampleParticleCycle(5.25,5372)),initial);
 });
 
-test('measured kicks reach petals in sequence across three sheets instead of scaling every petal together',()=>{
+test('measured kicks reach regions in sequence across three currents instead of scaling every region together',()=>{
   const early=sampleParticleKick([0,.5,.02,.8]);
   assert.ok(early[0]>0);
   assert.equal(Array.from(early).filter(value=>value>0).length,1);
@@ -50,7 +50,7 @@ test('measured kicks reach petals in sequence across three sheets instead of sca
   for(let index=0;index<15;index++)assert.ok(late[index]<.8,'response must remain bounded by measured kick strength');
 });
 
-test('silence, bass-only flow and invalid kick clocks cannot create petal strikes',()=>{
+test('silence, bass-only flow and invalid kick clocks cannot create region strikes',()=>{
   for(const drift of [[0,0,99,0],[200,0,99,0],[200,1,.3,0],[0,1,-1,1],[0,1,NaN,1],[0,1,.3,NaN],[0,0,5,1]]){
     assert.ok(sampleParticleKick(drift).every(value=>value===0));
   }
@@ -58,7 +58,7 @@ test('silence, bass-only flow and invalid kick clocks cannot create petal strike
   for(let i=0;i<15;i++)assert.ok(Math.abs(quiet[i]-loud[i]*.2)<1e-7,'detection confidence cannot replace measured strength');
 });
 
-test('petal response has no per-render integration and frozen or repeated deck renders stay identical',()=>{
+test('region response has no per-render integration and frozen or repeated deck renders stay identical',()=>{
   const shared=new Float32Array([2.7,.5,.22,.65]),target=new Float32Array(15);
   const reference=Array.from(sampleParticleKick(shared,target));
   for(let i=0;i<600;i++)assert.deepEqual(Array.from(sampleParticleKick(shared,target)),reference);
@@ -71,14 +71,14 @@ test('petal response has no per-render integration and frozen or repeated deck r
   }
 });
 
-test('closely spaced measured kicks release existing petal motion without a one-frame collapse',()=>{
+test('closely spaced measured kicks release existing region motion without a one-frame collapse',()=>{
   const motion=new ParticleMusicMotion(),dt=1/60;
   for(let frame=0;frame<60;frame++)motion.update(dt,[0,.8,frame*dt,.9]);
   assert.ok(motion.values.every(value=>value>.1));
   const previous=Array.from(motion.values);
   motion.update(dt,[0,.8,0,.9]);
   for(let i=0;i<15;i++){
-    assert.ok(motion.values[i]>previous[i]*.85,'a new attack cannot cut off the preceding petal release');
+    assert.ok(motion.values[i]>previous[i]*.85,'a new attack cannot cut off the preceding region release');
     assert.ok(motion.values[i]<previous[i]);
   }
   for(let frame=0;frame<600;frame++){
@@ -94,7 +94,7 @@ test('closely spaced measured kicks release existing petal motion without a one-
   assert.ok(motion.values.every(value=>value<1e-10));
 });
 
-test('shared petal smoothing freezes exactly, resets to rest, and does not mutate input clocks',()=>{
+test('shared region smoothing freezes exactly, resets to rest, and does not mutate input clocks',()=>{
   const motion=new ParticleMusicMotion(),drift=new Float32Array([2.4,.8,.17,.9]);
   const initial=Array.from(drift);
   for(let i=0;i<40;i++)assert.equal(motion.update(1/60,drift),motion.values);

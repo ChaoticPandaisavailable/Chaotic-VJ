@@ -64,6 +64,6 @@ export function renderVisualLibrary():string {
 }
 
 export function matchesVisual(entry:VisualEntry,query:string):boolean {
-  const haystack=`${entry.name} ${entry.note} ${entry.id} ${visualGroups.find(group=>group.id===entry.group)?.label}`.toLocaleLowerCase();
+  const haystack=`${entry.name} ${entry.note} ${entry.id} ${entry.id==='particles'?'粒子花云':''} ${visualGroups.find(group=>group.id===entry.group)?.label}`.toLocaleLowerCase();
   return query.trim().toLocaleLowerCase().split(/\s+/).every(term=>haystack.includes(term));
 }

@@ -1,3 +1,5 @@
+import { starfieldGLSL } from './starfield.ts';
+
 export const vertex = /* glsl */`
 varying vec2 vUv;
 void main() { vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }
@@ -65,11 +67,14 @@ uniform vec2 uResolution;
 uniform vec3 uColors[5],uBackgroundColor;
 uniform float uColorCount,uEnvelope,uPhotoPresence,uPhotoColorMix,uBrightness,uContrast,uSaturation,uGrain,uAberration,uBloom,uDrift,uTime,uBlackout;
 uniform vec4 uMusic;
-uniform float uSurface[6],uCellSize,uComplexity,uParticleMix,uGraphicMix,uGasMix;
+uniform float uSurface[6],uCellSize,uComplexity,uParticleMix,uGraphicMix,uGasMix,uSkyMix,uSkyTime;
+uniform vec4 uMeteor,uMeteorPath;
 uniform vec2 uFieldSize;
 uniform float uDepth,uShadow,uLight;
 uniform vec2 uWander;
 ${noise}
+vec2 hash2(vec2 p){return vec2(hash(p),hash(p+17.73));}
+${starfieldGLSL}
 vec3 palette(float value){
   return texture2D(uPalette,vec2((clamp(value,0.,1.)*255.+.5)/256.,.5)).rgb;
 }
@@ -137,6 +142,13 @@ void main(){
     vec3 linear=mix(bg/12.92,pow(max(vec3(0.),(bg+.055)/1.055),vec3(2.4)),step(vec3(.04045),bg));
     linear+=scattering*uBloom*(1.-uGraphicMix*.55)*(1.-paleGround*.92);
     bg=mix(linear*12.92,1.055*pow(max(vec3(0.),linear),vec3(1./2.4))-.055,step(vec3(.0031308),linear));
+  }
+  // A fixed distant sky sits behind the foreground. Adding it after history,
+  // relief and surface effects prevents trails, embossed stars and glyph skies.
+  if(uSkyMix>.001){
+    float stars=gasStars((vUv-.5)*aspect)*uSkyMix*(1.-smoothstep(.05,.52,base));
+    vec3 starlight=mix(palette(.78),vec3(1.),.55);
+    bg=1.-(1.-bg)*(1.-starlight*stars);
   }
   vec3 color=bg;
   if(uEnvelope*uPhotoPresence>.001){vec4 photo=texture2D(uPhotoHistory,vUv);

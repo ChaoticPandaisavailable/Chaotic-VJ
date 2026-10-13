@@ -107,7 +107,7 @@ export function mountStudio(app:HTMLElement,getConfig:()=>Config,changed:()=>voi
     find('#scene-label').textContent=config.performance.enabled?find('#scene-label').textContent:`${groupName} / ${title}`;
     for(const button of library.querySelectorAll<HTMLElement>('[data-visual-id]'))button.setAttribute('aria-pressed',String(button.dataset.visualId===entry?.id));
     const gas=config.field.style===6;
-    const names:Record<string,string>=config.field.style===19?{energy:'光幕亮度',chaos:'风中褶皱',density:'光帘高度',motion:'流动速度'}:config.field.style===20?{energy:'折射亮度',chaos:'波面起伏',density:'水体明暗',motion:'流动速度'}:{};
+    const names:Record<string,string>=config.field.style===9?{energy:'星尘亮度',chaos:'流束起伏',density:'粒子密度',motion:'星河流速'}:config.field.style===19?{energy:'光幕亮度',chaos:'风中褶皱',density:'光帘高度',motion:'流动速度'}:config.field.style===20?{energy:'折射亮度',chaos:'波面起伏',density:'水体明暗',motion:'流动速度'}:{};
     for(const [key,original] of macroNames){const input=find<HTMLInputElement>(`[data-macro="${key}"]`);input.closest('.macro')!.querySelector('b')!.textContent=names[key]??original.label;input.setAttribute('aria-label',names[key]??original.aria);}
     find('.vortex-forms').hidden=config.field.style!==4;
     find<HTMLSelectElement>('#vortex-form').value=config.variation.vortexForm??'spiral';

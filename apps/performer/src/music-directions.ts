@@ -11,6 +11,6 @@ export const musicDirections:Record<VisualEntryId,{summary:string;kick:string;fl
   vortex:{summary:'星际尘埃随风输送，保留深空旋臂与暗隙',kick:'沿旋臂与风带推进，停鼓后不回弹',flow:'持续输送星尘，推动不同形态的流向',detail:'局部尘粒闪亮，避免整幅闪烁'},
   storm:{summary:'声音深入体积，推动云体与局部透光',kick:'按不同深度推动云体并局部透光',flow:'持续推进三维云层的内部流动',detail:'仅点亮薄云边缘'},
   strings:{summary:'击打沿弦传播，流层在低频里交织',kick:'沿丝线向两侧传播一次波动',flow:'缓慢推动流层与空间形变',detail:'点亮局部细丝'},
-  particles:{summary:'花瓣依次舒展，薄纱承接有方向的流动',kick:'不同花瓣先后展开、折叠',flow:'沿薄纱推动局部起伏与纤维流动',detail:'点亮部分纤维与瓣缘'},
+  particles:{summary:'三股深空粒子流穿行，星尘形成有纵深的长河',kick:'推动不同流段局部起伏与错位',flow:'持续输送前后粒子流，带动内部波浪',detail:'点亮近景粒子与背景星点'},
   facets:{summary:'六组几何独立换位，落定后保留新的构图',kick:'实测 Kick 推进有序队形，平滑停留',flow:'Bass 带动各组缓慢漂移',detail:'高频点亮细线与边缘'},
 };

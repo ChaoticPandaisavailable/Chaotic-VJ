@@ -3,7 +3,7 @@ import { compositeFragment, photoFragment, vertex } from './shaders.ts';
 import { fieldFragment } from './fields.ts';
 import { createNoiseTexture } from './noise.ts';
 import { GasMotion, hasGasMotion } from './gas-motion.ts';
-import { StarfieldMotion } from './starfield.ts';
+import { StarfieldMotion, hasBackdropStars } from './starfield.ts';
 import { NebulaMotion } from './nebula-motion.ts';
 import { FlowReset } from './flow-reset.ts';
 import { compositionSeed } from '../shared/shuffle.ts';
@@ -160,6 +160,8 @@ export class VisualEngine {
     this.composite.uniforms.uSurface=u(this.variation.weights);this.composite.uniforms.uGlyphs=u(this.glyphs);
     this.composite.uniforms.uCellSize=u(12);this.composite.uniforms.uComplexity=u(.72);this.composite.uniforms.uParticleMix=u(0);
     this.composite.uniforms.uGraphicMix=u(0);this.composite.uniforms.uGasMix=u(1);
+    this.composite.uniforms.uSkyMix=u(0);
+    for(const key of ['uSkyTime','uMeteor','uMeteorPath'])this.composite.uniforms[key]=this.background.uniforms[key];
     this.composite.uniforms.uFieldSize=u(new THREE.Vector2(2,2));this.composite.uniforms.uDepth=u(.72);this.composite.uniforms.uShadow=u(.55);this.composite.uniforms.uLight=u(.6);
     this.composite.uniforms.uColors.value=Array.from({length:5},(_,i)=>new THREE.Vector3(...hexToLab(defaultConfig.palette.colors[Math.min(3,i)])));
     this.composite.uniforms.uPalette=u(this.colorLookup.texture);this.composite.uniforms.uSoftLight=u(this.softLight.texture);
@@ -322,7 +324,7 @@ export class VisualEngine {
     const facetPlanes=this.facetMotion.update(dt,music,paused);
     this.sceneMotion.update(dt,music,paused);
     this.lightMotion.update(dt,this.sceneMotion.drift,paused);
-    const petalWeights=this.particleMusicMotion.update(dt,this.sceneMotion.drift,paused);
+    const particleWeights=this.particleMusicMotion.update(dt,this.sceneMotion.drift,paused);
     let drivenPcm=pcm;
     if(pcm){
       if(this.musicPcm.length!==pcm.samples.length)this.musicPcm=new Float32Array(pcm.samples.length);
@@ -428,7 +430,7 @@ export class VisualEngine {
         }
         if(shape.style===9||shape.style===10){
           this.particleTarget??=new THREE.WebGLRenderTarget(deck.width,deck.height,{format:THREE.RedFormat,type:this.fieldType,depthBuffer:false,stencilBuffer:false,minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
-          if(shape.style===9){this.particles??=new ParticleCloud(this.glyphs);this.particles.render(this.renderer,this.particleTarget,driftState,this.simulationTime,0,0,shape.scale*b.uComposition.value.w,this.lastSeed,this.sceneMotion.music,this.sceneMotion.drift,petalWeights);}
+          if(shape.style===9){this.particles??=new ParticleCloud(this.glyphs);this.particles.render(this.renderer,this.particleTarget,driftState,this.simulationTime,0,0,shape.scale*b.uComposition.value.w,this.lastSeed,this.sceneMotion.music,this.sceneMotion.drift,particleWeights,macros);}
           else{this.facets??=new FacetComposition();this.facets.render(this.renderer,this.particleTarget,driftState,this.simulationTime,0,{...shape,scale:shape.scale*b.uComposition.value.w},{...macros,morph:b.uMorph.value},this.lastSeed,v,amount,facetPlanes);}
           b.uParticles.value=this.particleTarget.texture;
         }
@@ -457,6 +459,8 @@ export class VisualEngine {
     }
     const gasWeight=(style:number,retiring:RetiringScene|null,deck:SceneBuffer)=>deck.transitioning&&retiring?THREE.MathUtils.lerp(Number(hasGasMotion(retiring.field.style)),Number(hasGasMotion(style)),deck.nextMix(0)):Number(hasGasMotion(style));
     c.uGasMix.value=gasWeight(this.activeStyle,this.retiringScenes[0],this.deckA)*(1-this.crossfade)+gasWeight(this.activeB,this.retiringScenes[1],this.deckB)*this.crossfade;
+    const skyWeight=(style:number,retiring:RetiringScene|null,deck:SceneBuffer)=>deck.transitioning&&retiring?THREE.MathUtils.lerp(Number(hasBackdropStars(retiring.field.style)),Number(hasBackdropStars(style)),deck.nextMix(0)):Number(hasBackdropStars(style));
+    c.uSkyMix.value=skyWeight(this.activeStyle,this.retiringScenes[0],this.deckA)*(1-this.crossfade)+skyWeight(this.activeB,this.retiringScenes[1],this.deckB)*this.crossfade;
     const palette=config.palette;
     const blend=palette.transitionSeconds===0?1:1-Math.exp(-dt*4/palette.transitionSeconds);
     this.colorCue=colorCue(config);
