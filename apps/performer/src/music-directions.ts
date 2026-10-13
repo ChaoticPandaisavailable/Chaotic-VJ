@@ -2,6 +2,8 @@ import type { VisualEntryId } from './visual-library.ts';
 
 /** Explanations follow each material's actual response, not a generic pulsing scale. */
 export const musicDirections:Record<VisualEntryId,{summary:string;kick:string;flow:string;detail:string}>={
+  aurora:{summary:'风穿过折叠光帘，光浪沿长纤维传播',kick:'一束光浪从侧面穿过三层光幕',flow:'持续输送光帘内部的褶皱与长纤维',detail:'局部纤维与星点短暂闪亮'},
+  tidal:{summary:'音乐落入波面，涟漪与折射光相互交叠',kick:'从局部落点扩散一道真实击打的涟漪',flow:'持续输送波面与交叠折射纹理',detail:'点亮朝向光源的少量波峰'},
   nebula:{summary:'旋臂承接推动，远近星尘分层流动',kick:'推动旋臂内的云气，释放后继续前行',flow:'带动近远烟云沿不同速度输送',detail:'少量星点短暂变大、变亮'},
   clouds:{summary:'大块云体受推，薄云与星空轻轻呼应',kick:'宽缓地推动不同深度的云体',flow:'持续带动云海与近景薄雾',detail:'穿过云隙的星点轻轻闪亮'},
   ink:{summary:'墨层错位流动，保留山海的舒展层次',kick:'轻推墨层，保持长条轮廓',flow:'远层慢移，近层墨迹加速掠过',detail:'疏星微光，克制细部扰动'},

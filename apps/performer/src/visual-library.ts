@@ -19,6 +19,8 @@ const definitions = [
   {id:'strings',group:'spatial',sceneIndex:2},
   {id:'particles',group:'spatial',sceneIndex:3},
   {id:'facets',group:'spatial',sceneIndex:4},
+  {id:'aurora',group:'atmosphere',sceneIndex:19},
+  {id:'tidal',group:'spatial',sceneIndex:20},
 ] as const satisfies readonly {id:string;group:VisualGroupId;sceneIndex:number;atmosphere?:Config['look']['atmosphere'];name?:string;note?:string}[];
 
 export type VisualEntryId = typeof definitions[number]['id'];
@@ -54,7 +56,14 @@ export function applyVisual(config:Config,id:string):boolean {
 export function renderVisualLibrary():string {
   return `<section class="visual-library" aria-label="视觉库">
     <header class="visual-library-header"><h2>视觉库</h2><span class="visual-count">${visualEntries.length} 个效果 · 保留当前配色</span></header>
+    <label class="visual-search"><span>查找效果</span><input type="search" id="visual-search" placeholder="名称、质感或分类…　/" autocomplete="off" aria-label="查找效果" aria-controls="visual-grid"/></label>
     <div class="visual-filters" role="group" aria-label="视觉分类"><button type="button" data-visual-group="all" aria-pressed="true">全部</button>${visualGroups.map(group=>`<button type="button" data-visual-group="${group.id}" aria-pressed="false">${escapeHTML(group.label)}</button>`).join('')}</div>
-    <div class="visual-grid">${visualEntries.map(entry=>`<button type="button" class="visual-entry" data-visual-id="${entry.id}" data-visual-category="${entry.group}" aria-pressed="false" title="${escapeHTML(entry.note)}"><strong>${escapeHTML(entry.name)}</strong><small>${escapeHTML(entry.note)}</small></button>`).join('')}</div>
+    <div class="visual-grid" id="visual-grid">${visualEntries.map(entry=>`<button type="button" class="visual-entry" data-visual-id="${entry.id}" data-visual-category="${entry.group}" aria-pressed="false" title="${escapeHTML(entry.note)} · Shift 点击排入下一幕"><strong>${escapeHTML(entry.name)}</strong><small>${escapeHTML(entry.note)}</small></button>`).join('')}</div>
+    <p class="visual-empty" hidden>没有匹配的效果。<button type="button" data-clear-search>清空搜索</button></p>
   </section>`;
+}
+
+export function matchesVisual(entry:VisualEntry,query:string):boolean {
+  const haystack=`${entry.name} ${entry.note} ${entry.id} ${visualGroups.find(group=>group.id===entry.group)?.label}`.toLocaleLowerCase();
+  return query.trim().toLocaleLowerCase().split(/\s+/).every(term=>haystack.includes(term));
 }

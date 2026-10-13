@@ -75,12 +75,14 @@ export const scenePresets = [
   { name: '深空涡旋', label: '05 / VORTEX', note: '宇宙旋臂 · 星际风流',field:{style:4,gesture:'surge',amplitude:.38,scale:1.05},macros:{energy:.82,chaos:.7,density:.7,memory:.6,fragmentation:.3,photoPresence:.55,motion:.8,morph:.5}},
   { name: '断层风暴', label: '06 / RIFT', note: '层叠岩面 · 沉积切线',field:{style:5,gesture:'split',amplitude:.4,scale:1.15},macros:{energy:.88,chaos:.85,density:.65,memory:.35,fragmentation:.85,photoPresence:.55,motion:.85,morph:.9}},
   ...milkdropScenes.map(p=>({name:p.name,label:p.label,note:p.note,field:{style:p.style,gesture:'flow' as const,amplitude:.3,scale:1},macros:{energy:.6,chaos:.5,density:.6,memory:.3,fragmentation:.2,photoPresence:.55,motion:.5,morph:.5}})),
+  {name:'极光风幕',label:'19 / AURORA',note:'折叠光帘 · 风中长纤维',field:{style:19,gesture:'flow',amplitude:.12,scale:1.2},macros:{energy:.68,chaos:.5,density:.54,memory:.12,fragmentation:.12,photoPresence:.55,motion:.36,morph:.45}},
+  {name:'潮汐光池',label:'20 / TIDAL',note:'液态波面 · 交叠折射光',field:{style:20,gesture:'flow',amplitude:.08,scale:1.1},macros:{energy:.65,chaos:.48,density:.52,memory:.16,fragmentation:.12,photoPresence:.55,motion:.32,morph:.5}},
 ] satisfies {name:string;label:string;note:string;macros:Macros;field:Config['field']}[];
 
 /** Primary scenes reopen in their original continuous expression, preserving the current palette. */
 export function applyScenePreset(config:Config,preset:typeof scenePresets[number]){
   config.macros={...preset.macros};config.field={...preset.field};
-  if(preset.field.style>=6&&preset.field.style<=8){
+  if((preset.field.style>=6&&preset.field.style<=8)||preset.field.style>=19){
     config.variation={...config.variation,surface:'fluid',complexity:defaultConfig.variation.complexity,rotation:0,autoEvolve:false};
   }
 }

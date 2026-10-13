@@ -10,8 +10,9 @@ export const milkdropScenes=[
   {style:18,name:'朱利亚分形',label:'MD / JULIA',note:'数学分形 · 无限层叠',preset:'Flexi - Julia fractal'},
 ] as const;
 export const originalSceneCount=11;
-export const sceneCount=originalSceneCount+milkdropScenes.length;
+export const legacySceneCount=originalSceneCount+milkdropScenes.length;
+export const sceneCount=legacySceneCount+2;
 export const maxSceneId=sceneCount-1;
-export const isMilkdropStyle=(style:number)=>style>=originalSceneCount&&style<=maxSceneId;
+export const isMilkdropStyle=(style:number)=>style>=originalSceneCount&&style<legacySceneCount;
 /** Visible scene choices use original preset indexes so saved A/B and MIDI mappings stay valid. */
-export const availableSceneIndexes=[0,1,2,3,4,9] as const;
+export const availableSceneIndexes=[0,1,2,3,4,9,19,20] as const;

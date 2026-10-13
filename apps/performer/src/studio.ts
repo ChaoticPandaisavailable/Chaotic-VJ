@@ -1,5 +1,6 @@
 import type { Config } from '../../../packages/shared/config.ts';
-import { applyVisual, selectedVisual, visualGroups, type VisualGroupId } from './visual-library.ts';
+import { applyVisual, matchesVisual, selectedVisual, visualEntries, visualGroups, type VisualGroupId } from './visual-library.ts';
+import { mountPerformancePad } from './performance-pad.ts';
 import './studio.css';
 import { musicDirections } from './music-directions.ts';
 
@@ -69,18 +70,35 @@ export function mountStudio(app:HTMLElement,getConfig:()=>Config,changed:()=>voi
   };
 
   const library=find('.visual-library');
+  const macroNames=new Map(Array.from(app.querySelectorAll<HTMLInputElement>('[data-macro]')).map(input=>[input.dataset.macro!,{label:input.closest('.macro')!.querySelector('b')!.textContent!,aria:input.getAttribute('aria-label')!}]));
+  const search=find<HTMLInputElement>('#visual-search');
+  const pad=mountPerformancePad(library,getConfig,id=>{if(applyVisual(getConfig(),id))changed();},()=>{
+    if(app.classList.contains('stage-focused'))find('[data-studio-focus]').click();
+    search.focus();search.scrollIntoView({block:'nearest'});
+  },()=>{if(app.classList.contains('stage-focused'))find('[data-studio-focus]').click();});
   let group:VisualGroupId|'all'='atmosphere',previousId='';
   function filter(){
+    const query=search.value.trim();let count=0;
     for(const button of library.querySelectorAll<HTMLElement>('[data-visual-group]'))button.setAttribute('aria-pressed',String(button.dataset.visualGroup===group));
-    for(const entry of library.querySelectorAll<HTMLElement>('[data-visual-id]'))entry.hidden=group!=='all'&&entry.dataset.visualCategory!==group;
+    for(const button of library.querySelectorAll<HTMLElement>('[data-visual-id]')){
+      const entry=visualEntries.find(entry=>entry.id===button.dataset.visualId)!;
+      button.hidden=query?!matchesVisual(entry,query):group!=='all'&&entry.group!==group;
+      if(!button.hidden)count++;
+    }
+    find('.visual-count').textContent=query?`${count} 个匹配 · 搜索全部分类`:`${visualEntries.length} 个效果 · 保留当前配色`;
+    find('.visual-empty').hidden=count>0;
   }
+  search.addEventListener('input',filter);
+  search.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();search.value='';filter();search.blur();}});
+  find('[data-clear-search]').onclick=()=>{search.value='';filter();search.focus();};
   library.addEventListener('click',event=>{
     const target=event.target as HTMLElement,filterButton=target.closest<HTMLElement>('[data-visual-group]');
-    if(filterButton){group=filterButton.dataset.visualGroup as typeof group;filter();}
+    if(filterButton){group=filterButton.dataset.visualGroup as typeof group;search.value='';filter();}
     const entry=target.closest<HTMLElement>('[data-visual-id]');
-    if(entry&&applyVisual(getConfig(),entry.dataset.visualId!))changed();
+    if(entry)(event.shiftKey?pad.stage:pad.launch)(entry.dataset.visualId!);
   });
   function update(config:Config){
+    pad.update(config);
     const entry=selectedVisual(config);
     if(entry&&entry.id!==previousId){if(group!=='all')group=entry.group;previousId=entry.id;filter();}
     const title=entry?.name??'自定义视觉';find('.section-heading h1').textContent=title;
@@ -89,6 +107,8 @@ export function mountStudio(app:HTMLElement,getConfig:()=>Config,changed:()=>voi
     find('#scene-label').textContent=config.performance.enabled?find('#scene-label').textContent:`${groupName} / ${title}`;
     for(const button of library.querySelectorAll<HTMLElement>('[data-visual-id]'))button.setAttribute('aria-pressed',String(button.dataset.visualId===entry?.id));
     const gas=config.field.style===6;
+    const names:Record<string,string>=config.field.style===19?{energy:'光幕亮度',chaos:'风中褶皱',density:'光帘高度',motion:'流动速度'}:config.field.style===20?{energy:'折射亮度',chaos:'波面起伏',density:'水体明暗',motion:'流动速度'}:{};
+    for(const [key,original] of macroNames){const input=find<HTMLInputElement>(`[data-macro="${key}"]`);input.closest('.macro')!.querySelector('b')!.textContent=names[key]??original.label;input.setAttribute('aria-label',names[key]??original.aria);}
     find('.vortex-forms').hidden=config.field.style!==4;
     find<HTMLSelectElement>('#vortex-form').value=config.variation.vortexForm??'spiral';
     find('.chaotic-control').hidden=!gas;find('.sky-hint').hidden=!gas;

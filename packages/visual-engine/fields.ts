@@ -4,6 +4,7 @@ import { volumeField } from './volume.ts';
 import { secondaryStudies } from './studies.ts';
 import { revealMaskGLSL } from './morph.ts';
 import { gasCompositeGLSL } from './gas-motion.ts';
+import { lightFields } from './light-fields.ts';
 /** Original distance-field studies, inspired by The Book of Shaders chapters 11–13. */
 export const fieldFragment = /* glsl */`
 precision highp float;
@@ -44,6 +45,7 @@ vec3 cells(vec2 p,float t){vec2 base=floor(p),f=fract(p);float first=9.,second=9
 for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){vec2 grid=vec2(float(x),float(y));vec2 h=hash2(base+grid);vec2 site=.5+.36*sin(t*.58+6.2831*h);vec2 diff=grid+site-f;float d=dot(diff,diff);if(d<first){second=first;first=d;identity=h.x;}else second=min(second,d);}
 return vec3(sqrt(first),sqrt(second),identity);}
 ${secondaryStudies}
+${lightFields}
 ${revealMaskGLSL}
 vec2 choreography(vec2 p,float t){
  float a=uAmplitude;float spring=0.;
@@ -82,7 +84,11 @@ void main(){
  p=rot(sin(t*.12)*.18+uSpring*uAmplitude*.1)*origin+vec2(sin(t*.08)*.3,cos(t*.11)*.15)+uWander*.5;
  #endif
  float fresh=0.;
- #if FIELD_STYLE >= 11
+ #if FIELD_STYLE == 19
+ fresh=auroraField(p,skyPoint,t);
+ #elif FIELD_STYLE == 20
+ fresh=tidalField(p,t);
+ #elif FIELD_STYLE >= 11
  float sourceAngle=uAngle+uComposition.z;
  float cover=max(abs(cos(sourceAngle))+abs(sin(sourceAngle))/aspect.x,abs(cos(sourceAngle))+abs(sin(sourceAngle))*aspect.x);
  vec2 sourcePoint=rot(sourceAngle)*((vUv-.5)*aspect)/uComposition.w;
